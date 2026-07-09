@@ -118,9 +118,16 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
       if (!uri) throw new Error('没有拿到录音文件')
 
       const result = await parseVoiceFormAudio<T>({ uri, formType })
+      if (submitMode === 'fill') {
+        onApply(result.fields)
+        setVisible(false)
+        reset()
+        return
+      }
+
       setTranscript(result.transcript)
       setFields(result.fields)
-      setStatus(submitMode === 'fill' ? '已整理好，可以填入表单后检查修改' : '已整理好，可以确认提交')
+      setStatus('已整理好，可以确认提交')
     } catch (error) {
       setStatus('识别失败，请重试')
       Alert.alert('识别失败', error instanceof Error ? error.message : '语音识别失败')
@@ -225,7 +232,7 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
               </View>
             ) : null}
 
-            {fields ? (
+            {fields && submitMode === 'submit' ? (
               <View className="mt-4 bg-white rounded-lg p-4 border border-black/5">
                 <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">字段预览</Text>
                 {Object.entries(fields).map(([key, value]) => (
@@ -242,9 +249,7 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
                   {busy ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text className="text-white text-base font-semibold">
-                      {submitMode === 'fill' ? '填入表单' : '填入并提交'}
-                    </Text>
+                    <Text className="text-white text-base font-semibold">填入并提交</Text>
                   )}
                 </TouchableOpacity>
               </View>
