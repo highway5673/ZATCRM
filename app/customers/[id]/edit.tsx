@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import * as Clipboard from 'expo-clipboard'
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +18,14 @@ import { trackPerf } from '../../../lib/perf'
 import type { Customer, CustomerType } from '../../../types/database'
 
 const CUSTOMER_TYPES: CustomerType[] = ['潜在伙伴', '客户', '伙伴']
+
+async function loadClipboard() {
+  try {
+    return await import('expo-clipboard')
+  } catch {
+    return null
+  }
+}
 
 function extractWechatNickname(value: string) {
   const lines = value
@@ -69,7 +76,13 @@ export default function EditCustomerScreen() {
   }, [id, router])
 
   const pasteWechatNickname = useCallback(async (showResult = true) => {
-    const copiedText = await Clipboard.getStringAsync()
+    const clipboard = await loadClipboard()
+    if (!clipboard) {
+      Alert.alert('剪贴板不可用', '当前模拟器 App 未包含剪贴板模块，请重新安装 Expo Go 或重建开发客户端。')
+      return false
+    }
+
+    const copiedText = await clipboard.getStringAsync()
     if (!showResult && copiedText.trim() === previousWechatClipboardRef.current) {
       return false
     }
@@ -104,7 +117,10 @@ export default function EditCustomerScreen() {
   }, [pasteWechatNickname])
 
   const openWechatForNickname = async () => {
-    previousWechatClipboardRef.current = (await Clipboard.getStringAsync()).trim()
+    const clipboard = await loadClipboard()
+    previousWechatClipboardRef.current = clipboard
+      ? (await clipboard.getStringAsync()).trim()
+      : ''
     selectingWechatRef.current = true
     setSelectingWechat(true)
 
