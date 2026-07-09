@@ -139,7 +139,7 @@ function AddCustomerModal({
             />
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden">
+          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">姓名 *</Text>
               <TextInput
@@ -183,7 +183,7 @@ function AddCustomerModal({
             </View>
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden">
+          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
             <View className="px-4 pt-4 pb-3">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">客户类型</Text>
               <View className="flex-row gap-2">
@@ -191,7 +191,7 @@ function AddCustomerModal({
                   <TouchableOpacity
                     key={type}
                     onPress={() => setCustomerType(type)}
-                    className={`flex-1 py-2 rounded-xl border items-center ${
+                    className={`flex-1 py-2 rounded-lg border items-center ${
                       customerType === type
                         ? 'bg-[#007AFF] border-[#007AFF]'
                         : 'bg-white border-gray-200'
@@ -208,7 +208,7 @@ function AddCustomerModal({
             </View>
           </View>
 
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl overflow-hidden">
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg overflow-hidden">
             <View className="px-4 pt-4 pb-2">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">备注</Text>
               <TextInput
@@ -239,7 +239,7 @@ function CustomerCard({ customer, onPress }: { customer: Customer; onPress: () =
 
   return (
     <TouchableOpacity
-      className="bg-white rounded-2xl px-4 py-3.5 mb-3 flex-row items-center"
+      className="bg-white rounded-lg px-4 py-3.5 mb-3 flex-row items-center"
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -307,7 +307,7 @@ export default function CustomersScreen() {
             <Text className="text-white text-2xl leading-none mt-[-1]">+</Text>
           </TouchableOpacity>
         </View>
-        <View className="bg-gray-100 rounded-xl flex-row items-center px-3 py-2.5">
+        <View className="bg-gray-100 rounded-lg flex-row items-center px-3 py-2.5">
           <Text className="text-gray-400 mr-2">🔍</Text>
           <TextInput
             className="flex-1 text-base text-gray-800"

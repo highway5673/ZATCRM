@@ -130,7 +130,7 @@ export default function LoginScreen() {
           <Text className="text-gray-500 mb-10">输入手机号登录或注册</Text>
 
           <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">手机号</Text>
-          <View className="bg-white rounded-2xl px-4 py-3.5 mb-6 flex-row items-center">
+          <View className="bg-white rounded-lg px-4 py-3.5 mb-6 flex-row items-center">
             <Text className="text-gray-400 mr-2">+86</Text>
             <TextInput
               className="flex-1 text-base text-gray-900"
@@ -145,7 +145,7 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            className="bg-primary-600 rounded-2xl py-3.5 items-center"
+            className="bg-primary-600 rounded-lg py-3.5 items-center"
             onPress={handleSendOtp}
             disabled={loading}
             activeOpacity={0.85}
@@ -182,7 +182,7 @@ export default function LoginScreen() {
             <TextInput
               key={i}
               ref={ref => { otpRefs.current[i] = ref }}
-              className={`w-12 h-14 bg-white rounded-2xl text-center text-xl font-bold text-gray-900 border-2 ${
+              className={`w-12 h-14 bg-white rounded-lg text-center text-xl font-bold text-gray-900 border-2 ${
                 digit ? 'border-primary-600' : 'border-transparent'
               }`}
               keyboardType="number-pad"

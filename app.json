@@ -33,7 +33,12 @@
           "locationWhenInUsePermission": "需要访问位置信息以记录拜访地点"
         }
       ],
-      "expo-audio"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "需要访问麦克风以使用语音录入客户、跟踪、销售和任务。"
+        }
+      ]
     ]
   }
 }

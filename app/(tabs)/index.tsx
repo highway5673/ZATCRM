@@ -26,6 +26,14 @@ const TODAY = new Date()
 const MONTH_START = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1).toISOString()
 const MONTH_END = new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
 
+type QuickAction = {
+  title: string
+  detail: string
+  icon: string
+  tone: string
+  route: '/(tabs)/customers' | '/(tabs)/tracking' | '/(tabs)/sales' | '/(tabs)/tasks'
+}
+
 export default function DashboardScreen() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
@@ -113,11 +121,17 @@ export default function DashboardScreen() {
   ]
 
   const today = TODAY.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
+  const quickActions: QuickAction[] = [
+    { title: '管理客户', detail: '客户资料与类型', icon: '客', tone: 'bg-blue-500', route: '/(tabs)/customers' },
+    { title: '跟踪记录', detail: '拜访、电话、微信', icon: '跟', tone: 'bg-green-500', route: '/(tabs)/tracking' },
+    { title: '销售记录', detail: '产品销售和金额', icon: '售', tone: 'bg-purple-500', route: '/(tabs)/sales' },
+    { title: '任务管理', detail: '待办和提醒', icon: '办', tone: 'bg-amber-500', route: '/(tabs)/tasks' },
+  ]
 
   return (
     <ScrollView className="flex-1 bg-[#F2F2F7]" contentContainerStyle={{ paddingBottom: 40 }}>
       {/* 顶部 */}
-      <View className="bg-white px-5 pt-14 pb-5">
+      <View className="bg-white px-5 pt-14 pb-5 border-b border-gray-100">
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-3xl font-bold text-gray-900">首页</Text>
@@ -125,14 +139,14 @@ export default function DashboardScreen() {
           </View>
           <TouchableOpacity
             onPress={() => setShowSettings(s => !s)}
-            className="w-9 h-9 items-center justify-center"
+            className="w-10 h-10 bg-gray-100 rounded-lg items-center justify-center"
           >
-            <Text className="text-2xl">⚙️</Text>
+            <Text className="text-gray-700 text-lg font-semibold">•••</Text>
           </TouchableOpacity>
         </View>
 
         {showSettings && (
-          <View className="mt-4 bg-[#F2F2F7] rounded-2xl overflow-hidden">
+          <View className="mt-4 bg-[#F2F2F7] rounded-lg overflow-hidden border border-black/5">
             <View className="px-4 py-3 border-b border-gray-100">
               <Text className="text-xs text-gray-400 uppercase font-semibold">账号</Text>
               <Text className="text-gray-700 mt-1">{phone ? `+86 ${phone}` : '—'}</Text>
@@ -155,7 +169,7 @@ export default function DashboardScreen() {
           {cards.map((card) => (
             <TouchableOpacity
               key={card.label}
-              className="bg-white rounded-2xl p-4 shadow-sm"
+              className="bg-white rounded-lg p-4 border border-black/5"
               style={{ width: '47%' }}
               onPress={() => card.route && router.push(card.route)}
               activeOpacity={0.7}
@@ -176,58 +190,24 @@ export default function DashboardScreen() {
       {/* 快捷操作 */}
       <View className="px-4 mt-6">
         <Text className="text-xs font-semibold text-gray-500 uppercase mb-3 px-1">快捷操作</Text>
-        <View className="gap-2">
-          <TouchableOpacity
-            className="bg-white rounded-2xl px-4 py-4 flex-row items-center"
-            onPress={() => router.push('/(tabs)/customers')}
-            activeOpacity={0.7}
-          >
-            <Text className="text-2xl mr-3">👥</Text>
-            <View className="flex-1">
-              <Text className="text-gray-800 font-semibold">管理客户</Text>
-              <Text className="text-gray-400 text-xs mt-0.5">查看、新增、搜索客户</Text>
-            </View>
-            <Text className="text-gray-300 text-xl">›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="bg-white rounded-2xl px-4 py-4 flex-row items-center"
-            onPress={() => router.push('/(tabs)/tracking')}
-            activeOpacity={0.7}
-          >
-            <Text className="text-2xl mr-3">📋</Text>
-            <View className="flex-1">
-              <Text className="text-gray-800 font-semibold">跟踪记录</Text>
-              <Text className="text-gray-400 text-xs mt-0.5">记录拜访、电话、微信跟进</Text>
-            </View>
-            <Text className="text-gray-300 text-xl">›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="bg-white rounded-2xl px-4 py-4 flex-row items-center"
-            onPress={() => router.push('/(tabs)/sales')}
-            activeOpacity={0.7}
-          >
-            <Text className="text-2xl mr-3">💰</Text>
-            <View className="flex-1">
-              <Text className="text-gray-800 font-semibold">销售记录</Text>
-              <Text className="text-gray-400 text-xs mt-0.5">记录产品销售与成交</Text>
-            </View>
-            <Text className="text-gray-300 text-xl">›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="bg-white rounded-2xl px-4 py-4 flex-row items-center"
-            onPress={() => router.push('/(tabs)/tasks')}
-            activeOpacity={0.7}
-          >
-            <Text className="text-2xl mr-3">✅</Text>
-            <View className="flex-1">
-              <Text className="text-gray-800 font-semibold">任务管理</Text>
-              <Text className="text-gray-400 text-xs mt-0.5">查看和处理待办事项</Text>
-            </View>
-            <Text className="text-gray-300 text-xl">›</Text>
-          </TouchableOpacity>
+        <View className="bg-white rounded-lg overflow-hidden border border-black/5">
+          {quickActions.map((action, index) => (
+            <TouchableOpacity
+              key={action.title}
+              className={`px-4 py-3.5 flex-row items-center ${index > 0 ? 'border-t border-gray-100' : ''}`}
+              onPress={() => router.push(action.route)}
+              activeOpacity={0.7}
+            >
+              <View className={`w-10 h-10 rounded-lg ${action.tone} items-center justify-center mr-3`}>
+                <Text className="text-white text-base font-bold">{action.icon}</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-gray-900 font-semibold">{action.title}</Text>
+                <Text className="text-gray-400 text-xs mt-0.5">{action.detail}</Text>
+              </View>
+              <Text className="text-gray-300 text-xl">›</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
     </ScrollView>

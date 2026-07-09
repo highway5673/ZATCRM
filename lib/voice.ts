@@ -1,3 +1,5 @@
+import { supabase } from './supabase'
+
 export type VoiceFormType = 'customer' | 'tracking' | 'sales' | 'task'
 
 export type VoiceParsedFields = Record<string, string | number | null | undefined>
@@ -19,6 +21,7 @@ export async function parseVoiceFormAudio<T extends VoiceParsedFields>({
   uri,
   formType,
 }: ParseVoiceOptions): Promise<ParseVoiceResult<T>> {
+  const { data: { session } } = await supabase.auth.getSession()
   const formData = new FormData()
   formData.append('formType', formType)
   formData.append('audio', {
@@ -31,7 +34,7 @@ export async function parseVoiceFormAudio<T extends VoiceParsedFields>({
     method: 'POST',
     headers: {
       apikey: supabaseAnonKey,
-      Authorization: `Bearer ${supabaseAnonKey}`,
+      Authorization: `Bearer ${session?.access_token ?? supabaseAnonKey}`,
     },
     body: formData,
   })

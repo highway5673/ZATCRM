@@ -148,7 +148,7 @@ function AddTaskModal({
             />
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden">
+          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">任务标题 *</Text>
               <TextInput
@@ -166,7 +166,7 @@ function AddTaskModal({
                 <View className="flex-row gap-2">
                   <TouchableOpacity
                     onPress={() => setCustomerId('')}
-                    className={`px-3 py-2 rounded-xl border ${
+                    className={`px-3 py-2 rounded-lg border ${
                       !customerId ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
                     }`}
                   >
@@ -178,7 +178,7 @@ function AddTaskModal({
                     <TouchableOpacity
                       key={c.id}
                       onPress={() => setCustomerId(c.id)}
-                      className={`px-3 py-2 rounded-xl border ${
+                      className={`px-3 py-2 rounded-lg border ${
                         customerId === c.id
                           ? 'bg-[#007AFF] border-[#007AFF]'
                           : 'bg-white border-gray-200'
@@ -194,15 +194,15 @@ function AddTaskModal({
             </View>
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
+          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">提醒日期</Text>
-            <View className="flex-row bg-gray-100 rounded-xl p-1">
+            <View className="flex-row bg-gray-100 rounded-lg p-1">
               {REMINDER_OPTIONS.map(option => (
                 <TouchableOpacity
                   key={option.key}
                   onPress={() => setReminder(option.key)}
                   className={`flex-1 py-2 rounded-lg items-center ${
-                    reminder === option.key ? 'bg-white shadow-sm' : ''
+                    reminder === option.key ? 'bg-white ' : ''
                   }`}
                 >
                   <Text className={`text-sm font-medium ${
@@ -215,7 +215,7 @@ function AddTaskModal({
             </View>
           </View>
 
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl p-4">
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -264,7 +264,7 @@ function TaskItem({
 
   return (
     <TouchableOpacity
-      className={`bg-white rounded-2xl px-4 py-3.5 mb-3 flex-row items-center ${
+      className={`bg-white rounded-lg px-4 py-3.5 mb-3 flex-row items-center ${
         isDone ? 'opacity-50' : ''
       }`}
       onPress={showActions}
@@ -358,13 +358,13 @@ export default function TasksScreen() {
           </TouchableOpacity>
         </View>
 
-        <View className="flex-row bg-gray-100 rounded-xl p-1">
+        <View className="flex-row bg-gray-100 rounded-lg p-1">
           {FILTER_TABS.map(tab => (
             <TouchableOpacity
               key={tab.key}
               onPress={() => setFilter(tab.key as TaskStatus)}
               className={`flex-1 py-2 rounded-lg items-center ${
-                filter === tab.key ? 'bg-white shadow-sm' : ''
+                filter === tab.key ? 'bg-white ' : ''
               }`}
             >
               <Text className={`text-sm font-medium ${

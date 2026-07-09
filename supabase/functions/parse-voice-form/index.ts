@@ -89,7 +89,7 @@ async function transcribe(audio: File): Promise<string> {
     body: data,
   })
   const body = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(body?.error?.message ?? '转写失败')
+  if (!res.ok) throw new Error(formatOpenAIError(res.status, body, '转写失败'))
 
   return String(body?.text ?? '').trim()
 }
@@ -133,7 +133,7 @@ async function parseTranscript(transcript: string, formType: FormType) {
   })
 
   const body = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(body?.error?.message ?? '字段解析失败')
+  if (!res.ok) throw new Error(formatOpenAIError(res.status, body, '字段解析失败'))
 
   const content = body?.choices?.[0]?.message?.content
   if (!content) throw new Error('模型没有返回字段')
@@ -154,6 +154,18 @@ function buildJsonSchema(formType: FormType) {
 
 function isFormType(value: FormDataEntryValue | null): value is FormType {
   return typeof value === 'string' && value in FORM_SCHEMAS
+}
+
+function formatOpenAIError(status: number, body: unknown, fallback: string) {
+  const message = typeof body === 'object' && body && 'error' in body
+    ? (body as { error?: { message?: string } }).error?.message ?? ''
+    : ''
+
+  if (status === 401 || message.toLowerCase().includes('incorrect api key')) {
+    return '语音服务密钥无效，请在 Supabase Secrets 中配置正确的 OPENAI_API_KEY'
+  }
+  if (status === 429) return '语音服务请求过于频繁，请稍后再试'
+  return message || fallback
 }
 
 function ok(data: unknown) {

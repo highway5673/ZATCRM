@@ -155,7 +155,7 @@ function AddTrackingModal({
             />
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
+          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪方式</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row gap-2">
@@ -163,7 +163,7 @@ function AddTrackingModal({
                   <TouchableOpacity
                     key={m.key}
                     onPress={() => setMethod(m.key)}
-                    className={`px-3 py-2.5 rounded-xl border items-center min-w-[64px] ${
+                    className={`px-3 py-2.5 rounded-lg border items-center min-w-[64px] ${
                       method === m.key ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
                     }`}
                   >
@@ -181,7 +181,7 @@ function AddTrackingModal({
               </Text>
             )}
           </View>
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl p-4">
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪内容 *</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -307,7 +307,7 @@ function AddSalesModal({
             />
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden">
+          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">产品名称 *</Text>
               <TextInput
@@ -355,7 +355,7 @@ function AddSalesModal({
               />
             </View>
           </View>
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl p-4">
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -458,7 +458,7 @@ export default function CustomerDetailScreen() {
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         {/* 基本信息卡 */}
-        <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
+        <View className="mx-4 mt-4 bg-white rounded-lg p-4">
           <View className="flex-row items-center mb-3">
             <View className={`w-14 h-14 rounded-full ${avatarColor} items-center justify-center mr-4`}>
               <Text className="text-white text-xl font-bold">{customer.name.slice(0, 1)}</Text>
@@ -498,16 +498,16 @@ export default function CustomerDetailScreen() {
 
         {/* 统计栏 */}
         <View className="mx-4 mt-3 flex-row gap-3">
-          <View className="flex-1 bg-white rounded-2xl px-4 py-3 items-center">
+          <View className="flex-1 bg-white rounded-lg px-4 py-3 items-center">
             <Text className="text-[#007AFF] font-bold text-xl">{trackingRecords.length}</Text>
             <Text className="text-gray-400 text-xs mt-0.5">跟踪记录</Text>
           </View>
-          <View className="flex-1 bg-white rounded-2xl px-4 py-3 items-center">
+          <View className="flex-1 bg-white rounded-lg px-4 py-3 items-center">
             <Text className="text-green-600 font-bold text-xl">{salesRecords.length}</Text>
             <Text className="text-gray-400 text-xs mt-0.5">销售记录</Text>
           </View>
           {totalSales > 0 && (
-            <View className="flex-1 bg-white rounded-2xl px-4 py-3 items-center">
+            <View className="flex-1 bg-white rounded-lg px-4 py-3 items-center">
               <Text className="text-purple-600 font-bold text-base">
                 ¥{totalSales >= 10000 ? `${(totalSales / 10000).toFixed(1)}万` : totalSales.toLocaleString()}
               </Text>
@@ -519,14 +519,14 @@ export default function CustomerDetailScreen() {
         {/* 快捷操作 */}
         <View className="mx-4 mt-3 flex-row gap-3">
           <TouchableOpacity
-            className="flex-1 bg-[#007AFF] rounded-2xl py-3 items-center"
+            className="flex-1 bg-[#007AFF] rounded-lg py-3 items-center"
             onPress={() => { setActiveTab('tracking'); setShowAddTracking(true) }}
             activeOpacity={0.85}
           >
             <Text className="text-white text-sm font-semibold">+ 跟踪记录</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            className="flex-1 bg-green-500 rounded-2xl py-3 items-center"
+            className="flex-1 bg-green-500 rounded-lg py-3 items-center"
             onPress={() => { setActiveTab('sales'); setShowAddSales(true) }}
             activeOpacity={0.85}
           >
@@ -536,10 +536,10 @@ export default function CustomerDetailScreen() {
 
         {/* Tab 切换 */}
         <View className="mx-4 mt-4">
-          <View className="flex-row bg-gray-200 rounded-2xl p-1">
+          <View className="flex-row bg-gray-200 rounded-lg p-1">
             <TouchableOpacity
               onPress={() => setActiveTab('tracking')}
-              className={`flex-1 py-2 rounded-xl items-center ${activeTab === 'tracking' ? 'bg-white' : ''}`}
+              className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'tracking' ? 'bg-white' : ''}`}
             >
               <Text className={`text-sm font-medium ${activeTab === 'tracking' ? 'text-gray-800' : 'text-gray-400'}`}>
                 跟踪记录 {trackingRecords.length > 0 ? `(${trackingRecords.length})` : ''}
@@ -547,7 +547,7 @@ export default function CustomerDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab('sales')}
-              className={`flex-1 py-2 rounded-xl items-center ${activeTab === 'sales' ? 'bg-white' : ''}`}
+              className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'sales' ? 'bg-white' : ''}`}
             >
               <Text className={`text-sm font-medium ${activeTab === 'sales' ? 'text-gray-800' : 'text-gray-400'}`}>
                 销售记录 {salesRecords.length > 0 ? `(${salesRecords.length})` : ''}
@@ -558,7 +558,7 @@ export default function CustomerDetailScreen() {
 
         {/* 跟踪记录列表 */}
         {activeTab === 'tracking' && (
-          <View className="mx-4 mt-3 bg-white rounded-2xl overflow-hidden">
+          <View className="mx-4 mt-3 bg-white rounded-lg overflow-hidden">
             {trackingRecords.length === 0 ? (
               <View className="py-10 items-center">
                 <Text className="text-gray-300 text-4xl mb-3">📋</Text>
@@ -589,7 +589,7 @@ export default function CustomerDetailScreen() {
 
         {/* 销售记录列表 */}
         {activeTab === 'sales' && (
-          <View className="mx-4 mt-3 bg-white rounded-2xl overflow-hidden">
+          <View className="mx-4 mt-3 bg-white rounded-lg overflow-hidden">
             {salesRecords.length === 0 ? (
               <View className="py-10 items-center">
                 <Text className="text-gray-300 text-4xl mb-3">💰</Text>

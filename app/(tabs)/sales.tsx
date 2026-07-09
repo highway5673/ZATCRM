@@ -179,7 +179,7 @@ function AddSalesModal({
 
           {/* 关联客户 */}
           {!defaultCustomerId && (
-            <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
+            <View className="mx-4 mt-4 bg-white rounded-lg p-4">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">关联客户 *</Text>
               {customers.length === 0 ? (
                 <Text className="text-gray-400 text-sm">请先添加客户</Text>
@@ -190,7 +190,7 @@ function AddSalesModal({
                       <TouchableOpacity
                         key={c.id}
                         onPress={() => setCustomerId(c.id)}
-                        className={`px-3 py-2 rounded-xl border ${
+                        className={`px-3 py-2 rounded-lg border ${
                           customerId === c.id
                             ? 'bg-[#007AFF] border-[#007AFF]'
                             : 'bg-white border-gray-200'
@@ -213,7 +213,7 @@ function AddSalesModal({
           )}
 
           {/* 产品信息 */}
-          <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden">
+          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">产品名称 *</Text>
               <TextInput
@@ -262,7 +262,7 @@ function AddSalesModal({
           </View>
 
           {/* 备注 */}
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl p-4">
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -284,7 +284,7 @@ function AddSalesModal({
 
 function SalesCard({ item }: { item: SalesWithCustomer }) {
   return (
-    <View className="bg-white rounded-2xl p-4 mb-3">
+    <View className="bg-white rounded-lg p-4 mb-3">
       <View className="flex-row items-start justify-between">
         <View className="flex-1 mr-3">
           <Text className="text-gray-800 font-semibold text-base">{item.product_name}</Text>
@@ -356,14 +356,14 @@ export default function SalesScreen() {
 
         {records.length > 0 && (
           <View className="flex-row gap-3">
-            <View className="flex-1 bg-green-50 rounded-2xl px-4 py-3">
+            <View className="flex-1 bg-green-50 rounded-lg px-4 py-3">
               <Text className="text-xs text-green-600 font-semibold">本月销售</Text>
               <Text className="text-green-700 font-bold text-lg mt-1">
                 ¥{monthAmount.toLocaleString('zh-CN')}
               </Text>
               <Text className="text-green-400 text-xs">{monthRecords.length} 笔</Text>
             </View>
-            <View className="flex-1 bg-blue-50 rounded-2xl px-4 py-3">
+            <View className="flex-1 bg-blue-50 rounded-lg px-4 py-3">
               <Text className="text-xs text-[#007AFF] font-semibold">累计销售</Text>
               <Text className="text-[#007AFF] font-bold text-lg mt-1">
                 ¥{totalAmount.toLocaleString('zh-CN')}

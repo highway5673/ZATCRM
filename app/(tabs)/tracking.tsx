@@ -192,7 +192,7 @@ function AddTrackingModal({
           </View>
 
           {/* 跟踪方式 */}
-          <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
+          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪方式</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row gap-2">
@@ -200,7 +200,7 @@ function AddTrackingModal({
                   <TouchableOpacity
                     key={m.key}
                     onPress={() => setMethod(m.key)}
-                    className={`px-3 py-2.5 rounded-xl border items-center min-w-[64px] ${
+                    className={`px-3 py-2.5 rounded-lg border items-center min-w-[64px] ${
                       method === m.key
                         ? 'bg-[#007AFF] border-[#007AFF]'
                         : 'bg-white border-gray-200'
@@ -223,7 +223,7 @@ function AddTrackingModal({
 
           {/* 关联客户 */}
           {!defaultCustomerId && (
-            <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
+            <View className="mx-4 mt-4 bg-white rounded-lg p-4">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">关联客户 *</Text>
               {customers.length === 0 ? (
                 <Text className="text-gray-400 text-sm">请先在客户页添加客户</Text>
@@ -234,7 +234,7 @@ function AddTrackingModal({
                       <TouchableOpacity
                         key={c.id}
                         onPress={() => setCustomerId(c.id)}
-                        className={`px-3 py-2 rounded-xl border ${
+                        className={`px-3 py-2 rounded-lg border ${
                           customerId === c.id
                             ? 'bg-[#007AFF] border-[#007AFF]'
                             : 'bg-white border-gray-200'
@@ -257,7 +257,7 @@ function AddTrackingModal({
           )}
 
           {/* 跟踪内容 */}
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl p-4">
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪内容 *</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -280,7 +280,7 @@ function AddTrackingModal({
 function TrackingCard({ item }: { item: TrackingWithCustomer }) {
   const m = METHOD_MAP[item.method]
   return (
-    <View className="bg-white rounded-2xl p-4 mb-3">
+    <View className="bg-white rounded-lg p-4 mb-3">
       <View className="flex-row items-start justify-between mb-2">
         <View className="flex-row items-center gap-2 flex-1">
           <Text className="text-lg">{m?.emoji ?? '📝'}</Text>
