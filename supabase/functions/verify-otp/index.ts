@@ -57,36 +57,47 @@ serve(async (req) => {
     await markOtp(record.id, { used: true })
 
     const email = `${normalized}@crm.internal`
-    await ensureAuthUser(email, normalized)
-    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email,
+    const userId = await ensureAuthUser(email, normalized)
+
+    // Issue a one-time random password for this login session
+    const sessionPassword = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+      .map(b => b.toString(16).padStart(2, '0')).join('')
+
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password: sessionPassword,
     })
-    if (linkError) throw linkError
+    if (updateError) throw updateError
 
-    const tokenHash = linkData.properties?.hashed_token
-    if (!tokenHash) throw new Error('Magic link token was not returned')
-
-    return ok({ verified: true, tokenHash })
+    return ok({ verified: true, email, sessionPassword })
   } catch (e) {
     console.error('verify-otp error:', e)
     return fail('服务异常')
   }
 })
 
-async function ensureAuthUser(email: string, phone: string) {
-  const { error } = await supabaseAdmin.auth.admin.createUser({
+async function ensureAuthUser(email: string, phone: string): Promise<string> {
+  const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email,
     email_confirm: true,
     user_metadata: { phone },
   })
-  if (!error) return
+  if (!createError && createData.user) return createData.user.id
 
-  const message = error.message.toLowerCase()
-  if (message.includes('already') || message.includes('registered') || message.includes('exists')) {
-    return
-  }
-  throw error
+  // User already exists — find by email via admin REST
+  const listRes = await fetch(
+    `${SUPABASE_URL}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&page=1&per_page=50`,
+    {
+      headers: {
+        'apikey': SERVICE_KEY,
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+      },
+    },
+  )
+  const listData = await listRes.json()
+  const existing = (listData.users ?? []).find((u: { email: string }) => u.email === email)
+  if (existing?.id) return existing.id
+
+  throw new Error(`Could not ensure auth user for ${email}: ${createError?.message}`)
 }
 
 async function markOtp(id: string, data: Record<string, unknown>) {

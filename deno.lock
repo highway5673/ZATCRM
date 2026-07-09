@@ -33,6 +33,7 @@
         "npm:expo@~57.0.4",
         "npm:nativewind@^4.2.6",
         "npm:patch-package@^8.0.1",
+        "npm:react-native-reanimated@4.5.0",
         "npm:react-native-safe-area-context@5.7",
         "npm:react-native-screens@^4.25.2",
         "npm:react-native-url-polyfill@3",

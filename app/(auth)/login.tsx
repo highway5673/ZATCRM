@@ -103,9 +103,9 @@ export default function LoginScreen() {
       return
     }
 
-    const { error: authError } = await supabase.auth.verifyOtp({
-      type: 'email',
-      token_hash: verifyResult.tokenHash,
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: verifyResult.email,
+      password: verifyResult.sessionPassword,
     })
     if (authError) {
       Alert.alert('登录失败', authError.message)
