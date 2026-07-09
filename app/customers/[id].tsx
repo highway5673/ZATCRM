@@ -781,16 +781,32 @@ export default function CustomerDetailScreen() {
           </TouchableOpacity>
         </View>
         <View className="mx-4 mt-3">
-          <TouchableOpacity
-            className="bg-amber-500 rounded-lg py-3 items-center"
-            onPress={() => {
-              setActiveTab('trials')
-              router.push(`/customers/${id}/trial`)
-            }}
-            activeOpacity={0.85}
-          >
-            <Text className="text-white text-sm font-semibold">+ 新增试用</Text>
-          </TouchableOpacity>
+          <View className="flex-row gap-3">
+            <TouchableOpacity
+              className="flex-1 bg-amber-500 rounded-lg py-3 items-center"
+              onPress={() => {
+                setActiveTab('trials')
+                router.push(`/customers/${id}/trial`)
+              }}
+              activeOpacity={0.85}
+            >
+              <Text className="text-white text-sm font-semibold">+ 新增试用</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 bg-[#111827] rounded-lg py-3 items-center"
+              onPress={() => router.push({
+                pathname: '/(tabs)/tasks',
+                params: {
+                  createTask: '1',
+                  customerId: String(id),
+                  customerName: customer.name,
+                },
+              })}
+              activeOpacity={0.85}
+            >
+              <Text className="text-white text-sm font-semibold">+ 创建任务</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Tab 切换 */}

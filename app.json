@@ -38,7 +38,8 @@
         {
           "microphonePermission": "需要访问麦克风以使用语音录入客户、跟踪、销售和任务。"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }
