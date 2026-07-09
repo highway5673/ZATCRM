@@ -6,6 +6,7 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { formatLocationLabel, openNavigation, resolveVisitLocation } from '../../lib/location'
+import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type {
   Customer, CustomerLocation, CustomerType, TrackingMethod, SalesRecord,
@@ -98,50 +99,61 @@ function AddTrackingModal({
   }
 
   const saveTracking = async (fields?: TrackingVoiceFields) => {
+    const startedAt = perfNow()
     const nextContent = (fields?.content ?? content).trim()
     const nextMethod = fields?.method ?? method
     const nextGiftName = (fields?.gift_name ?? giftName).trim()
     const nextGiftQuantity = Math.max(1, fields?.gift_quantity ?? (parseInt(giftQuantity, 10) || 0))
     if (!nextContent) throw new Error('请输入跟踪内容')
 
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); throw new Error('登录已失效') }
+    try {
+      setSaving(true)
+      const { data: { user } } = await trackPerf('customerDetail.tracking.add.getUser', () => supabase.auth.getUser())
+      if (!user) { setSaving(false); throw new Error('登录已失效') }
 
-    let locationId: string | null = null
-    if (nextMethod === 'visit') {
-      setGpsStatus('获取位置中...')
-      const loc = await resolveVisitLocation(customerId)
-      if (loc) {
-        locationId = loc.locationId
-        setGpsStatus(loc.address ? `📍 ${loc.address}` : '📍 已记录位置')
-      } else {
-        setGpsStatus('⚠️ 无法获取位置')
+      let locationId: string | null = null
+      if (nextMethod === 'visit') {
+        setGpsStatus('获取位置中...')
+        const loc = await trackPerf('customerDetail.tracking.add.resolveLocation', () =>
+          resolveVisitLocation(customerId),
+        { customerId })
+        if (loc) {
+          locationId = loc.locationId
+          setGpsStatus(loc.address ? `📍 ${loc.address}` : '📍 已记录位置')
+        } else {
+          setGpsStatus('⚠️ 无法获取位置')
+        }
       }
+
+      const { data: inserted, error } = await trackPerf('customerDetail.tracking.add.insertRecord', () =>
+        supabase.from('tracking_records').insert({
+          user_id: user.id,
+          customer_id: customerId,
+          method: nextMethod,
+          content: nextContent,
+          location_id: locationId,
+          tracked_at: new Date().toISOString(),
+        }).select('id').single(),
+      { method: nextMethod, hasLocation: Boolean(locationId) })
+
+      if (error) throw error
+      if (nextGiftName && inserted) {
+        const { error: giftError } = await trackPerf('customerDetail.tracking.add.insertGift', () =>
+          supabase.from('tracking_gifts').insert({
+            tracking_record_id: inserted.id,
+            name: nextGiftName,
+            quantity: nextGiftQuantity,
+          }),
+        { quantity: nextGiftQuantity })
+        if (giftError) throw giftError
+      }
+
+      setSaving(false)
+      reset()
+      onSaved()
+    } finally {
+      perfLog('customerDetail.tracking.add.total', startedAt, { method: nextMethod, hasGift: Boolean(nextGiftName) })
     }
-
-    const { data: inserted, error } = await supabase.from('tracking_records').insert({
-      user_id: user.id,
-      customer_id: customerId,
-      method: nextMethod,
-      content: nextContent,
-      location_id: locationId,
-      tracked_at: new Date().toISOString(),
-    }).select('id').single()
-
-    if (error) throw error
-    if (nextGiftName && inserted) {
-      const { error: giftError } = await supabase.from('tracking_gifts').insert({
-        tracking_record_id: inserted.id,
-        name: nextGiftName,
-        quantity: nextGiftQuantity,
-      })
-      if (giftError) throw giftError
-    }
-
-    setSaving(false)
-    reset()
-    onSaved()
   }
 
   const handleSave = async () => {
@@ -286,6 +298,7 @@ function AddSalesModal({
   }
 
   const saveSales = async (fields?: SalesVoiceFields) => {
+    const startedAt = perfNow()
     const nextProductName = (fields?.product_name ?? productName).trim()
     const nextQuantity = fields?.quantity ?? (parseInt(quantity) || 1)
     const nextUnitPrice = fields?.unit_price ?? (unitPrice ? parseFloat(unitPrice) : null)
@@ -294,25 +307,31 @@ function AddSalesModal({
 
     if (!nextProductName) throw new Error('请输入产品名称')
 
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); throw new Error('登录已失效') }
+    try {
+      setSaving(true)
+      const { data: { user } } = await trackPerf('customerDetail.sales.add.getUser', () => supabase.auth.getUser())
+      if (!user) { setSaving(false); throw new Error('登录已失效') }
 
-    const { error } = await supabase.from('sales_records').insert({
-      user_id: user.id,
-      customer_id: customerId,
-      product_name: nextProductName,
-      quantity: nextQuantity,
-      unit_price: nextUnitPrice,
-      amount: nextAmount,
-      sale_date: new Date().toISOString().slice(0, 10),
-      notes: nextNotes || null,
-    })
+      const { error } = await trackPerf('customerDetail.sales.add.insert', () =>
+        supabase.from('sales_records').insert({
+          user_id: user.id,
+          customer_id: customerId,
+          product_name: nextProductName,
+          quantity: nextQuantity,
+          unit_price: nextUnitPrice,
+          amount: nextAmount,
+          sale_date: new Date().toISOString().slice(0, 10),
+          notes: nextNotes || null,
+        }),
+      { quantity: nextQuantity, hasAmount: nextAmount != null })
 
-    setSaving(false)
-    if (error) throw error
-    reset()
-    onSaved()
+      setSaving(false)
+      if (error) throw error
+      reset()
+      onSaved()
+    } finally {
+      perfLog('customerDetail.sales.add.total', startedAt)
+    }
   }
 
   const handleSave = async () => {
@@ -442,21 +461,23 @@ export default function CustomerDetailScreen() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const [customerRes, locationsRes, trackingRes, salesRes] = await Promise.all([
-      supabase.from('customers').select('*').eq('id', id).single(),
-      supabase.from('customer_locations')
-        .select('*')
-        .eq('customer_id', id)
-        .order('created_at', { ascending: false }),
-      supabase.from('tracking_records')
-        .select('*, customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
-        .eq('customer_id', id)
-        .order('tracked_at', { ascending: false }),
-      supabase.from('sales_records')
-        .select('*')
-        .eq('customer_id', id)
-        .order('sale_date', { ascending: false }),
-    ])
+    const [customerRes, locationsRes, trackingRes, salesRes] = await trackPerf('customerDetail.fetchAll', () =>
+      Promise.all([
+        supabase.from('customers').select('*').eq('id', id).single(),
+        supabase.from('customer_locations')
+          .select('*')
+          .eq('customer_id', id)
+          .order('created_at', { ascending: false }),
+        supabase.from('tracking_records')
+          .select('*, customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
+          .eq('customer_id', id)
+          .order('tracked_at', { ascending: false }),
+        supabase.from('sales_records')
+          .select('*')
+          .eq('customer_id', id)
+          .order('sale_date', { ascending: false }),
+      ]),
+    { customerId: id })
 
     if (customerRes.data) setCustomer(customerRes.data)
     if (locationsRes.data) setCustomerLocations(locationsRes.data)
@@ -487,28 +508,36 @@ export default function CustomerDetailScreen() {
       {
         text: '领回',
         onPress: async () => {
+          const startedAt = perfNow()
           try {
-            const { data: { user } } = await supabase.auth.getUser()
+            const { data: { user } } = await trackPerf('customerDetail.trial.reclaim.getUser', () =>
+              supabase.auth.getUser())
             if (!user) throw new Error('登录已失效')
 
-            const { data: inserted, error } = await supabase.from('tracking_records').insert({
-              user_id: user.id,
-              customer_id: id,
-              method: 'other',
-              content: `领回试用物料：${item.name}`,
-              tracked_at: new Date().toISOString(),
-            }).select('id').single()
+            const { data: inserted, error } = await trackPerf('customerDetail.trial.reclaim.insertRecord', () =>
+              supabase.from('tracking_records').insert({
+                user_id: user.id,
+                customer_id: id,
+                method: 'other',
+                content: `领回试用物料：${item.name}`,
+                tracked_at: new Date().toISOString(),
+              }).select('id').single(),
+            { itemName: item.name })
 
             if (error) throw error
-            const { error: giftError } = await supabase.from('tracking_gifts').insert({
-              tracking_record_id: inserted.id,
-              name: item.name,
-              quantity: -Math.abs(item.quantity),
-            })
+            const { error: giftError } = await trackPerf('customerDetail.trial.reclaim.insertGift', () =>
+              supabase.from('tracking_gifts').insert({
+                tracking_record_id: inserted.id,
+                name: item.name,
+                quantity: -Math.abs(item.quantity),
+              }),
+            { quantity: -Math.abs(item.quantity) })
             if (giftError) throw giftError
             fetchAll()
           } catch (error) {
             Alert.alert('领回失败', error instanceof Error ? error.message : '请稍后重试')
+          } finally {
+            perfLog('customerDetail.trial.reclaim.total', startedAt, { itemName: item.name })
           }
         },
       },

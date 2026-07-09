@@ -5,6 +5,7 @@ import {
   ScrollView, TextInput,
 } from 'react-native'
 import { supabase } from '../../lib/supabase'
+import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { Task, TaskStatus } from '../../types/database'
 
@@ -51,7 +52,8 @@ function AddTaskModal({
 
   useEffect(() => {
     if (visible) {
-      supabase.from('customers').select('id, name').order('name').then(({ data }) => {
+      trackPerf('tasks.add.loadCustomers', () =>
+        supabase.from('customers').select('id, name').order('name')).then(({ data }) => {
         if (data) setCustomers(data)
       })
     }
@@ -78,29 +80,36 @@ function AddTaskModal({
   }
 
   const saveTask = async (fields?: TaskVoiceFields) => {
+    const startedAt = perfNow()
     const nextTitle = (fields?.title ?? title).trim()
     const nextNotes = (fields?.notes ?? notes).trim()
     const nextCustomerId = customerId || findCustomerId(fields?.customer_name)
     const nextReminder = fields?.reminder ?? reminder
 
     if (!nextTitle) throw new Error('请输入任务标题')
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); throw new Error('登录已失效') }
+    try {
+      setSaving(true)
+      const { data: { user } } = await trackPerf('tasks.add.getUser', () => supabase.auth.getUser())
+      if (!user) { setSaving(false); throw new Error('登录已失效') }
 
-    const { error } = await supabase.from('tasks').insert({
-      user_id: user.id,
-      title: nextTitle,
-      notes: nextNotes || null,
-      customer_id: nextCustomerId || null,
-      remind_at: getReminderAt(nextReminder),
-      status: 'pending' as TaskStatus,
-    })
+      const { error } = await trackPerf('tasks.add.insert', () =>
+        supabase.from('tasks').insert({
+          user_id: user.id,
+          title: nextTitle,
+          notes: nextNotes || null,
+          customer_id: nextCustomerId || null,
+          remind_at: getReminderAt(nextReminder),
+          status: 'pending' as TaskStatus,
+        }),
+      { hasCustomer: Boolean(nextCustomerId), reminder: nextReminder })
 
-    setSaving(false)
-    if (error) throw error
-    reset()
-    onSaved()
+      setSaving(false)
+      if (error) throw error
+      reset()
+      onSaved()
+    } finally {
+      perfLog('tasks.add.total', startedAt)
+    }
   }
 
   const handleSave = async () => {
@@ -317,10 +326,11 @@ export default function TasksScreen() {
 
   const fetchTasks = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*, customers(name)')
-      .order('created_at', { ascending: false })
+    const { data, error } = await trackPerf('tasks.fetchList', () =>
+      supabase
+        .from('tasks')
+        .select('*, customers(name)')
+        .order('created_at', { ascending: false }))
 
     if (!error && data) setTasks(data as unknown as TaskWithCustomer[])
     setLoading(false)
@@ -331,7 +341,9 @@ export default function TasksScreen() {
   }, [fetchTasks])
 
   const handleStatusChange = async (id: string, status: TaskStatus) => {
-    await supabase.from('tasks').update({ status }).eq('id', id)
+    await trackPerf('tasks.updateStatus', () =>
+      supabase.from('tasks').update({ status }).eq('id', id),
+    { status })
     setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t))
   }
 

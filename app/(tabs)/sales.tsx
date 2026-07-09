@@ -5,6 +5,7 @@ import {
   ScrollView, TextInput,
 } from 'react-native'
 import { supabase } from '../../lib/supabase'
+import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { SalesRecord } from '../../types/database'
 
@@ -51,7 +52,8 @@ function AddSalesModal({
   useEffect(() => {
     if (visible) {
       setCustomerId(defaultCustomerId ?? '')
-      supabase.from('customers').select('id, name, company').order('name').then(({ data }) => {
+      trackPerf('sales.add.loadCustomers', () =>
+        supabase.from('customers').select('id, name, company').order('name')).then(({ data }) => {
         if (data) setCustomers(data)
       })
     }
@@ -101,6 +103,7 @@ function AddSalesModal({
   }
 
   const saveSales = async (fields?: SalesVoiceFields) => {
+    const startedAt = perfNow()
     const nextCustomerId = defaultCustomerId || customerId || findCustomerId(fields?.customer_name)
     const nextProductName = (fields?.product_name ?? productName).trim()
     const nextQuantity = fields?.quantity ?? (parseInt(quantity) || 1)
@@ -111,25 +114,31 @@ function AddSalesModal({
     if (!nextCustomerId) throw new Error('请选择客户')
     if (!nextProductName) throw new Error('请输入产品名称')
 
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); throw new Error('登录已失效') }
+    try {
+      setSaving(true)
+      const { data: { user } } = await trackPerf('sales.add.getUser', () => supabase.auth.getUser())
+      if (!user) { setSaving(false); throw new Error('登录已失效') }
 
-    const { error } = await supabase.from('sales_records').insert({
-      user_id: user.id,
-      customer_id: nextCustomerId,
-      product_name: nextProductName,
-      quantity: nextQuantity,
-      unit_price: nextUnitPrice,
-      amount: nextAmount,
-      sale_date: new Date().toISOString().slice(0, 10),
-      notes: nextNotes || null,
-    })
+      const { error } = await trackPerf('sales.add.insert', () =>
+        supabase.from('sales_records').insert({
+          user_id: user.id,
+          customer_id: nextCustomerId,
+          product_name: nextProductName,
+          quantity: nextQuantity,
+          unit_price: nextUnitPrice,
+          amount: nextAmount,
+          sale_date: new Date().toISOString().slice(0, 10),
+          notes: nextNotes || null,
+        }),
+      { quantity: nextQuantity, hasAmount: nextAmount != null })
 
-    setSaving(false)
-    if (error) throw error
-    reset()
-    onSaved()
+      setSaving(false)
+      if (error) throw error
+      reset()
+      onSaved()
+    } finally {
+      perfLog('sales.add.total', startedAt)
+    }
   }
 
   const handleSave = async () => {
@@ -320,11 +329,12 @@ export default function SalesScreen() {
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('sales_records')
-      .select('*, customers(name, company)')
-      .order('sale_date', { ascending: false })
-      .limit(200)
+    const { data, error } = await trackPerf('sales.fetchList', () =>
+      supabase
+        .from('sales_records')
+        .select('*, customers(name, company)')
+        .order('sale_date', { ascending: false })
+        .limit(200))
 
     if (!error && data) setRecords(data as unknown as SalesWithCustomer[])
     setLoading(false)

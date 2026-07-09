@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { Customer, CustomerType } from '../../types/database'
 
@@ -66,32 +67,39 @@ function AddCustomerModal({
   }
 
   const saveCustomer = async (fields?: CustomerVoiceFields) => {
+    const startedAt = perfNow()
     const nextName = (fields?.name ?? name).trim()
     if (!nextName) throw new Error('请输入客户姓名')
 
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); throw new Error('登录已失效') }
+    try {
+      setSaving(true)
+      const { data: { user } } = await trackPerf('customers.add.getUser', () => supabase.auth.getUser())
+      if (!user) { setSaving(false); throw new Error('登录已失效') }
 
-    const nextType = fields?.customer_type && CUSTOMER_TYPES.includes(fields.customer_type)
-      ? fields.customer_type
-      : customerType
+      const nextType = fields?.customer_type && CUSTOMER_TYPES.includes(fields.customer_type)
+        ? fields.customer_type
+        : customerType
 
-    const { error } = await supabase.from('customers').insert({
-      user_id: user.id,
-      name: nextName,
-      company: (fields?.company ?? company).trim() || null,
-      phone: (fields?.phone ?? phone).trim() || null,
-      wechat: (fields?.wechat ?? wechat).trim() || null,
-      notes: (fields?.notes ?? notes).trim() || null,
-      tags: [],
-      customer_type: nextType,
-    })
+      const { error } = await trackPerf('customers.add.insert', () =>
+        supabase.from('customers').insert({
+          user_id: user.id,
+          name: nextName,
+          company: (fields?.company ?? company).trim() || null,
+          phone: (fields?.phone ?? phone).trim() || null,
+          wechat: (fields?.wechat ?? wechat).trim() || null,
+          notes: (fields?.notes ?? notes).trim() || null,
+          tags: [],
+          customer_type: nextType,
+        }),
+      { customerType: nextType })
 
-    setSaving(false)
-    if (error) throw error
-    reset()
-    onSaved()
+      setSaving(false)
+      if (error) throw error
+      reset()
+      onSaved()
+    } finally {
+      perfLog('customers.add.total', startedAt)
+    }
   }
 
   const handleSave = async () => {
@@ -275,10 +283,11 @@ export default function CustomersScreen() {
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { data, error } = await trackPerf('customers.fetchList', () =>
+      supabase
+        .from('customers')
+        .select('*')
+        .order('created_at', { ascending: false }))
 
     if (!error && data) setCustomers(data)
     setLoading(false)

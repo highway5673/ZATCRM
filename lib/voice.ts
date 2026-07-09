@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy'
 
+import { trackPerf } from './perf'
 import { supabase } from './supabase'
 
 export type VoiceFormType = 'customer' | 'tracking' | 'sales' | 'task'
@@ -23,19 +24,21 @@ export async function parseVoiceFormAudio<T extends VoiceParsedFields>({
   uri,
   formType,
 }: ParseVoiceOptions): Promise<ParseVoiceResult<T>> {
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { session } } = await trackPerf('voice.getSession', () => supabase.auth.getSession(), { formType })
 
-  const res = await FileSystem.uploadAsync(`${supabaseUrl}/functions/v1/parse-voice-form`, uri, {
-    httpMethod: 'POST',
-    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-    fieldName: 'audio',
-    mimeType: 'audio/m4a',
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${session?.access_token ?? supabaseAnonKey}`,
-    },
-    parameters: { formType },
-  })
+  const res = await trackPerf('voice.uploadAndParse', () =>
+    FileSystem.uploadAsync(`${supabaseUrl}/functions/v1/parse-voice-form`, uri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: 'audio',
+      mimeType: 'audio/m4a',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${session?.access_token ?? supabaseAnonKey}`,
+      },
+      parameters: { formType },
+    }),
+  { formType })
 
   const body = parseJson(res.body)
   if (res.status < 200 || res.status >= 300) {

@@ -7,6 +7,7 @@ import {
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { formatLocationLabel, openNavigation, resolveVisitLocation } from '../../lib/location'
+import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { CustomerLocation, TrackingMethod } from '../../types/database'
 
@@ -84,7 +85,8 @@ function AddTrackingModal({
   useEffect(() => {
     if (visible) {
       setCustomerId(defaultCustomerId ?? '')
-      supabase.from('customers').select('id, name, company').order('name').then(({ data }) => {
+      trackPerf('tracking.add.loadCustomers', () =>
+        supabase.from('customers').select('id, name, company').order('name')).then(({ data }) => {
         if (data) setCustomers(data)
       })
     }
@@ -139,6 +141,7 @@ function AddTrackingModal({
   }
 
   const saveTracking = async (fields?: TrackingVoiceFields) => {
+    const startedAt = perfNow()
     const nextCustomerId = defaultCustomerId || customerId || findCustomerId(fields?.customer_name)
     const nextContent = (fields?.content ?? content).trim()
     const nextMethod = fields?.method ?? method
@@ -148,45 +151,55 @@ function AddTrackingModal({
     if (!nextCustomerId) throw new Error('请选择关联客户')
     if (!nextContent) throw new Error('请输入跟踪内容')
 
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); throw new Error('登录已失效') }
+    try {
+      setSaving(true)
+      const { data: { user } } = await trackPerf('tracking.add.getUser', () => supabase.auth.getUser())
+      if (!user) { setSaving(false); throw new Error('登录已失效') }
 
-    let locationId: string | null = null
+      let locationId: string | null = null
 
-    if (nextMethod === 'visit') {
-      setGpsStatus('获取位置中...')
-      const loc = await resolveVisitLocation(nextCustomerId)
-      if (loc) {
-        locationId = loc.locationId
-        setGpsStatus(loc.address ? `📍 ${loc.address}` : '📍 已记录位置')
-      } else {
-        setGpsStatus('⚠️ 无法获取位置，已跳过')
+      if (nextMethod === 'visit') {
+        setGpsStatus('获取位置中...')
+        const loc = await trackPerf('tracking.add.resolveLocation', () =>
+          resolveVisitLocation(nextCustomerId),
+        { customerId: nextCustomerId })
+        if (loc) {
+          locationId = loc.locationId
+          setGpsStatus(loc.address ? `📍 ${loc.address}` : '📍 已记录位置')
+        } else {
+          setGpsStatus('⚠️ 无法获取位置，已跳过')
+        }
       }
+
+      const { data: inserted, error } = await trackPerf('tracking.add.insertRecord', () =>
+        supabase.from('tracking_records').insert({
+          user_id: user.id,
+          customer_id: nextCustomerId,
+          method: nextMethod,
+          content: nextContent,
+          location_id: locationId,
+          tracked_at: new Date().toISOString(),
+        }).select('id').single(),
+      { method: nextMethod, hasLocation: Boolean(locationId) })
+
+      if (error) throw error
+      if (nextGiftName && inserted) {
+        const { error: giftError } = await trackPerf('tracking.add.insertGift', () =>
+          supabase.from('tracking_gifts').insert({
+            tracking_record_id: inserted.id,
+            name: nextGiftName,
+            quantity: nextGiftQuantity,
+          }),
+        { quantity: nextGiftQuantity })
+        if (giftError) throw giftError
+      }
+
+      setSaving(false)
+      reset()
+      onSaved()
+    } finally {
+      perfLog('tracking.add.total', startedAt, { method: nextMethod, hasGift: Boolean(nextGiftName) })
     }
-
-    const { data: inserted, error } = await supabase.from('tracking_records').insert({
-      user_id: user.id,
-      customer_id: nextCustomerId,
-      method: nextMethod,
-      content: nextContent,
-      location_id: locationId,
-      tracked_at: new Date().toISOString(),
-    }).select('id').single()
-
-    if (error) throw error
-    if (nextGiftName && inserted) {
-      const { error: giftError } = await supabase.from('tracking_gifts').insert({
-        tracking_record_id: inserted.id,
-        name: nextGiftName,
-        quantity: nextGiftQuantity,
-      })
-      if (giftError) throw giftError
-    }
-
-    setSaving(false)
-    reset()
-    onSaved()
   }
 
   const handleSave = async () => {
@@ -430,11 +443,12 @@ export default function TrackingScreen() {
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('tracking_records')
-      .select('*, customers(name, company, customer_locations(address, latitude, longitude)), customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
-      .order('tracked_at', { ascending: false })
-      .limit(100)
+    const { data, error } = await trackPerf('tracking.fetchList', () =>
+      supabase
+        .from('tracking_records')
+        .select('*, customers(name, company, customer_locations(address, latitude, longitude)), customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
+        .order('tracked_at', { ascending: false })
+        .limit(100))
 
     if (!error && data) setRecords(data as unknown as TrackingWithCustomer[])
     setLoading(false)

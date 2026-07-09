@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../../lib/supabase'
+import { trackPerf } from '../../../lib/perf'
 import type { Customer, CustomerType } from '../../../types/database'
 
 const CUSTOMER_TYPES: CustomerType[] = ['潜在伙伴', '客户', '伙伴']
@@ -29,7 +30,9 @@ export default function EditCustomerScreen() {
   const [customerType, setCustomerType] = useState<CustomerType>('潜在伙伴')
 
   useEffect(() => {
-    supabase.from('customers').select('*').eq('id', id).single().then(({ data, error }) => {
+    trackPerf('customers.edit.load', () =>
+      supabase.from('customers').select('*').eq('id', id).single(),
+    { customerId: id }).then(({ data, error }) => {
       if (error || !data) {
         Alert.alert('加载失败', '无法读取客户信息')
         router.back()
@@ -55,14 +58,16 @@ export default function EditCustomerScreen() {
 
     try {
       setSaving(true)
-      const { error } = await supabase.from('customers').update({
-        name: nextName,
-        company: company.trim() || null,
-        phone: phone.trim() || null,
-        wechat: wechat.trim() || null,
-        notes: notes.trim() || null,
-        customer_type: customerType,
-      }).eq('id', id)
+      const { error } = await trackPerf('customers.edit.update', () =>
+        supabase.from('customers').update({
+          name: nextName,
+          company: company.trim() || null,
+          phone: phone.trim() || null,
+          wechat: wechat.trim() || null,
+          notes: notes.trim() || null,
+          customer_type: customerType,
+        }).eq('id', id),
+      { customerId: id, customerType })
 
       if (error) throw error
       router.back()
