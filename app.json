@@ -32,7 +32,8 @@
           "locationAlwaysAndWhenInUsePermission": "需要访问位置信息以记录拜访地点",
           "locationWhenInUsePermission": "需要访问位置信息以记录拜访地点"
         }
-      ]
+      ],
+      "expo-audio"
     ]
   }
 }

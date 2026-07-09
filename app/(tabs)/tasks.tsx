@@ -5,10 +5,18 @@ import {
   ScrollView, TextInput,
 } from 'react-native'
 import { supabase } from '../../lib/supabase'
+import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { Task, TaskStatus } from '../../types/database'
 
 type CustomerOption = { id: string; name: string }
 type ReminderChoice = 'today' | 'tomorrow' | 'none'
+
+type TaskVoiceFields = {
+  customer_name?: string | null
+  title?: string | null
+  notes?: string | null
+  reminder?: ReminderChoice | null
+}
 
 const REMINDER_OPTIONS: { key: ReminderChoice; label: string }[] = [
   { key: 'today', label: '今天' },
@@ -52,116 +60,175 @@ function AddTaskModal({
   const reset = () => { setTitle(''); setNotes(''); setCustomerId(''); setReminder('today') }
   const handleClose = () => { reset(); onClose() }
 
-  const handleSave = async () => {
-    if (!title.trim()) { Alert.alert('提示', '请输入任务标题'); return }
+  const findCustomerId = (name?: string | null) => {
+    if (!name) return ''
+    const text = name.trim()
+    const matched = customers.find(c => c.name === text || c.name.includes(text) || text.includes(c.name))
+    return matched?.id ?? ''
+  }
+
+  const applyVoiceFields = (fields: TaskVoiceFields) => {
+    if (fields.title) setTitle(fields.title)
+    if (fields.notes) setNotes(fields.notes)
+    if (fields.reminder) setReminder(fields.reminder)
+    if (fields.customer_name) {
+      const matchedId = findCustomerId(fields.customer_name)
+      if (matchedId) setCustomerId(matchedId)
+    }
+  }
+
+  const saveTask = async (fields?: TaskVoiceFields) => {
+    const nextTitle = (fields?.title ?? title).trim()
+    const nextNotes = (fields?.notes ?? notes).trim()
+    const nextCustomerId = customerId || findCustomerId(fields?.customer_name)
+    const nextReminder = fields?.reminder ?? reminder
+
+    if (!nextTitle) throw new Error('请输入任务标题')
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
+    if (!user) { setSaving(false); throw new Error('登录已失效') }
 
     const { error } = await supabase.from('tasks').insert({
       user_id: user.id,
-      title: title.trim(),
-      notes: notes.trim() || null,
-      customer_id: customerId || null,
-      remind_at: getReminderAt(reminder),
+      title: nextTitle,
+      notes: nextNotes || null,
+      customer_id: nextCustomerId || null,
+      remind_at: getReminderAt(nextReminder),
       status: 'pending' as TaskStatus,
     })
 
     setSaving(false)
-    if (error) { Alert.alert('保存失败', error.message) }
-    else { reset(); onSaved() }
+    if (error) throw error
+    reset()
+    onSaved()
+  }
+
+  const handleSave = async () => {
+    try {
+      await saveTask()
+    } catch (error) {
+      Alert.alert('保存失败', error instanceof Error ? error.message : '保存失败')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
-        className="flex-1 bg-white"
+        className="flex-1 bg-[#F2F2F7]"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-row items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+        <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
           <TouchableOpacity onPress={handleClose}>
             <Text className="text-gray-500 text-base">取消</Text>
           </TouchableOpacity>
           <Text className="text-base font-semibold text-gray-800">新增任务</Text>
           <TouchableOpacity onPress={handleSave} disabled={saving}>
             {saving
-              ? <ActivityIndicator size="small" color="#2563EB" />
-              : <Text className="text-primary-600 text-base font-semibold">保存</Text>
+              ? <ActivityIndicator size="small" color="#007AFF" />
+              : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
             }
           </TouchableOpacity>
         </View>
 
-        <ScrollView className="flex-1 px-5 pt-4" keyboardShouldPersistTaps="handled">
-          <Text className="text-sm text-gray-500 mb-1">任务标题 *</Text>
-          <TextInput
-            className="border border-gray-200 rounded-xl px-4 py-3 mb-4 text-base"
-            placeholder="例：给张三发送报价单"
-            value={title}
-            onChangeText={setTitle}
-            autoFocus
-          />
+        <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+          <View className="mx-4 mt-4">
+            <VoiceInputButton<TaskVoiceFields>
+              formType="task"
+              title="语音新增任务"
+              scriptLines={[
+                '任务：明天上午给张三发送报价单',
+                '关联客户：张三，提醒：今天 / 明天 / 无提醒',
+                '备注：附上产品参数和优惠方案',
+              ]}
+              disabled={saving}
+              onApply={applyVoiceFields}
+              onSubmit={saveTask}
+            />
+          </View>
 
-          <Text className="text-sm text-gray-500 mb-2">关联客户（可选）</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-            <View className="flex-row gap-2">
-              <TouchableOpacity
-                onPress={() => setCustomerId('')}
-                className={`px-3 py-2 rounded-xl border ${
-                  !customerId ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'
-                }`}
-              >
-                <Text className={`text-sm ${!customerId ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
-                  无
-                </Text>
-              </TouchableOpacity>
-              {customers.map(c => (
+          <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden">
+            <View className="px-4 pt-4 pb-2 border-b border-gray-50">
+              <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">任务标题 *</Text>
+              <TextInput
+                className="text-base text-gray-900 pb-2"
+                placeholder="例：给张三发送报价单"
+                placeholderTextColor="#9CA3AF"
+                value={title}
+                onChangeText={setTitle}
+                autoFocus
+              />
+            </View>
+            <View className="px-4 pt-4 pb-4">
+              <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">关联客户（可选）</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View className="flex-row gap-2">
+                  <TouchableOpacity
+                    onPress={() => setCustomerId('')}
+                    className={`px-3 py-2 rounded-xl border ${
+                      !customerId ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <Text className={`text-sm ${!customerId ? 'text-white font-medium' : 'text-gray-400'}`}>
+                      无
+                    </Text>
+                  </TouchableOpacity>
+                  {customers.map(c => (
+                    <TouchableOpacity
+                      key={c.id}
+                      onPress={() => setCustomerId(c.id)}
+                      className={`px-3 py-2 rounded-xl border ${
+                        customerId === c.id
+                          ? 'bg-[#007AFF] border-[#007AFF]'
+                          : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      <Text className={`text-sm ${customerId === c.id ? 'text-white font-medium' : 'text-gray-700'}`}>
+                        {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+
+          <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
+            <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">提醒日期</Text>
+            <View className="flex-row bg-gray-100 rounded-xl p-1">
+              {REMINDER_OPTIONS.map(option => (
                 <TouchableOpacity
-                  key={c.id}
-                  onPress={() => setCustomerId(c.id)}
-                  className={`px-3 py-2 rounded-xl border ${
-                    customerId === c.id
-                      ? 'bg-primary-600 border-primary-600'
-                      : 'bg-white border-gray-200'
+                  key={option.key}
+                  onPress={() => setReminder(option.key)}
+                  className={`flex-1 py-2 rounded-lg items-center ${
+                    reminder === option.key ? 'bg-white shadow-sm' : ''
                   }`}
                 >
-                  <Text className={`text-sm ${customerId === c.id ? 'text-white font-medium' : 'text-gray-700'}`}>
-                    {c.name}
+                  <Text className={`text-sm font-medium ${
+                    reminder === option.key ? 'text-gray-800' : 'text-gray-400'
+                  }`}>
+                    {option.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-          </ScrollView>
-
-          <Text className="text-sm text-gray-500 mb-2">提醒日期</Text>
-          <View className="flex-row bg-gray-100 rounded-xl p-1 mb-4">
-            {REMINDER_OPTIONS.map(option => (
-              <TouchableOpacity
-                key={option.key}
-                onPress={() => setReminder(option.key)}
-                className={`flex-1 py-2 rounded-lg items-center ${
-                  reminder === option.key ? 'bg-white shadow-sm' : ''
-                }`}
-              >
-                <Text className={`text-sm font-medium ${
-                  reminder === option.key ? 'text-gray-800' : 'text-gray-400'
-                }`}>
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
           </View>
 
-          <Text className="text-sm text-gray-500 mb-1">备注</Text>
-          <TextInput
-            className="border border-gray-200 rounded-xl px-4 py-3 mb-8 text-base"
-            placeholder="补充说明..."
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-            value={notes}
-            onChangeText={setNotes}
-            style={{ minHeight: 80 }}
-          />
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl p-4">
+            <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
+            <TextInput
+              className="text-base text-gray-900"
+              placeholder="补充说明..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              value={notes}
+              onChangeText={setNotes}
+              style={{ minHeight: 80 }}
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -272,19 +339,19 @@ export default function TasksScreen() {
   const pendingCount = tasks.filter(t => t.status === 'pending').length
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-[#F2F2F7]">
       <View className="bg-white px-5 pt-14 pb-4">
         <View className="flex-row items-center justify-between mb-4">
           <View className="flex-row items-center gap-2">
-            <Text className="text-2xl font-bold text-gray-800">任务</Text>
+            <Text className="text-3xl font-bold text-gray-900">任务</Text>
             {pendingCount > 0 && (
-              <View className="bg-primary-600 rounded-full min-w-5 h-5 px-1.5 items-center justify-center">
+              <View className="bg-[#007AFF] rounded-full min-w-5 h-5 px-1.5 items-center justify-center">
                 <Text className="text-white text-xs font-bold">{pendingCount}</Text>
               </View>
             )}
           </View>
           <TouchableOpacity
-            className="bg-primary-600 w-9 h-9 rounded-full items-center justify-center"
+            className="bg-[#007AFF] w-9 h-9 rounded-full items-center justify-center"
             onPress={() => setShowAdd(true)}
           >
             <Text className="text-white text-2xl leading-none mt-[-1]">+</Text>
@@ -312,7 +379,7 @@ export default function TasksScreen() {
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color="#007AFF" />
         </View>
       ) : (
         <FlatList

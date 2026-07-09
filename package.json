@@ -7,6 +7,8 @@
     "@supabase/supabase-js": "^2.110.1",
     "babel-preset-expo": "^57.0.2",
     "expo": "~57.0.4",
+    "expo-asset": "~57.0.3",
+    "expo-audio": "~57.0.0",
     "expo-constants": "~57.0.3",
     "expo-linking": "~57.0.2",
     "expo-location": "~57.0.2",

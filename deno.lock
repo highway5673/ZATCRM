@@ -24,6 +24,8 @@
         "npm:@supabase/supabase-js@^2.110.1",
         "npm:@types/react@~19.2.2",
         "npm:babel-preset-expo@^57.0.2",
+        "npm:expo-asset@~57.0.3",
+        "npm:expo-audio@57.0",
         "npm:expo-constants@~57.0.3",
         "npm:expo-linking@~57.0.2",
         "npm:expo-location@~57.0.2",

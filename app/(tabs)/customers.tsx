@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { Customer, CustomerType } from '../../types/database'
 
 const CUSTOMER_TYPES: CustomerType[] = ['潜在伙伴', '客户', '伙伴']
@@ -14,6 +15,15 @@ const TYPE_STYLE: Record<CustomerType, { bg: string; text: string }> = {
   '潜在伙伴': { bg: 'bg-gray-100', text: 'text-gray-500' },
   '客户':     { bg: 'bg-blue-50', text: 'text-[#007AFF]' },
   '伙伴':     { bg: 'bg-green-50', text: 'text-green-600' },
+}
+
+type CustomerVoiceFields = {
+  name?: string | null
+  company?: string | null
+  phone?: string | null
+  wechat?: string | null
+  customer_type?: CustomerType | null
+  notes?: string | null
 }
 
 function AddCustomerModal({
@@ -44,32 +54,53 @@ function AddCustomerModal({
 
   const handleClose = () => { reset(); onClose() }
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert('提示', '请输入客户姓名')
-      return
+  const applyVoiceFields = (fields: CustomerVoiceFields) => {
+    if (fields.name) setName(fields.name)
+    if (fields.company) setCompany(fields.company)
+    if (fields.phone) setPhone(fields.phone)
+    if (fields.wechat) setWechat(fields.wechat)
+    if (fields.notes) setNotes(fields.notes)
+    if (fields.customer_type && CUSTOMER_TYPES.includes(fields.customer_type)) {
+      setCustomerType(fields.customer_type)
     }
+  }
+
+  const saveCustomer = async (fields?: CustomerVoiceFields) => {
+    const nextName = (fields?.name ?? name).trim()
+    if (!nextName) throw new Error('请输入客户姓名')
+
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
+    if (!user) { setSaving(false); throw new Error('登录已失效') }
+
+    const nextType = fields?.customer_type && CUSTOMER_TYPES.includes(fields.customer_type)
+      ? fields.customer_type
+      : customerType
 
     const { error } = await supabase.from('customers').insert({
       user_id: user.id,
-      name: name.trim(),
-      company: company.trim() || null,
-      phone: phone.trim() || null,
-      wechat: wechat.trim() || null,
-      notes: notes.trim() || null,
+      name: nextName,
+      company: (fields?.company ?? company).trim() || null,
+      phone: (fields?.phone ?? phone).trim() || null,
+      wechat: (fields?.wechat ?? wechat).trim() || null,
+      notes: (fields?.notes ?? notes).trim() || null,
       tags: [],
-      customer_type: customerType,
+      customer_type: nextType,
     })
 
     setSaving(false)
-    if (error) {
-      Alert.alert('保存失败', error.message)
-    } else {
-      reset()
-      onSaved()
+    if (error) throw error
+    reset()
+    onSaved()
+  }
+
+  const handleSave = async () => {
+    try {
+      await saveCustomer()
+    } catch (error) {
+      Alert.alert('保存失败', error instanceof Error ? error.message : '保存失败')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -93,6 +124,21 @@ function AddCustomerModal({
         </View>
 
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+          <View className="mx-4 mt-4">
+            <VoiceInputButton<CustomerVoiceFields>
+              formType="customer"
+              title="语音新增客户"
+              scriptLines={[
+                '客户姓名：张三',
+                '公司：某某科技，手机号：13800000000，微信：zhangsan',
+                '客户类型：潜在伙伴 / 客户 / 伙伴，备注：需要重点跟进',
+              ]}
+              disabled={saving}
+              onApply={applyVoiceFields}
+              onSubmit={saveCustomer}
+            />
+          </View>
+
           <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">姓名 *</Text>

@@ -5,9 +5,19 @@ import {
   ScrollView, TextInput,
 } from 'react-native'
 import { supabase } from '../../lib/supabase'
+import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { SalesRecord } from '../../types/database'
 
 type CustomerOption = { id: string; name: string; company: string | null }
+
+type SalesVoiceFields = {
+  customer_name?: string | null
+  product_name?: string | null
+  quantity?: number | null
+  unit_price?: number | null
+  amount?: number | null
+  notes?: string | null
+}
 
 type SalesWithCustomer = SalesRecord & {
   customers: { name: string; company: string | null } | null
@@ -66,31 +76,69 @@ function AddSalesModal({
 
   const handleClose = () => { reset(); onClose() }
 
-  const handleSave = async () => {
-    if (!customerId) { Alert.alert('提示', '请选择客户'); return }
-    if (!productName.trim()) { Alert.alert('提示', '请输入产品名称'); return }
+  const findCustomerId = (name?: string | null) => {
+    if (!name) return ''
+    const text = name.trim()
+    const matched = customers.find(c =>
+      c.name === text ||
+      c.name.includes(text) ||
+      text.includes(c.name) ||
+      (c.company ? text.includes(c.company) : false)
+    )
+    return matched?.id ?? ''
+  }
+
+  const applyVoiceFields = (fields: SalesVoiceFields) => {
+    if (fields.product_name) setProductName(fields.product_name)
+    if (fields.quantity != null) setQuantity(String(fields.quantity))
+    if (fields.unit_price != null) setUnitPrice(String(fields.unit_price))
+    if (fields.amount != null) setAmount(String(fields.amount))
+    if (fields.notes) setNotes(fields.notes)
+    if (!defaultCustomerId && fields.customer_name) {
+      const matchedId = findCustomerId(fields.customer_name)
+      if (matchedId) setCustomerId(matchedId)
+    }
+  }
+
+  const saveSales = async (fields?: SalesVoiceFields) => {
+    const nextCustomerId = defaultCustomerId || customerId || findCustomerId(fields?.customer_name)
+    const nextProductName = (fields?.product_name ?? productName).trim()
+    const nextQuantity = fields?.quantity ?? (parseInt(quantity) || 1)
+    const nextUnitPrice = fields?.unit_price ?? (unitPrice ? parseFloat(unitPrice) : null)
+    const nextAmount = fields?.amount ?? (amount ? parseFloat(amount) : null)
+    const nextNotes = (fields?.notes ?? notes).trim()
+
+    if (!nextCustomerId) throw new Error('请选择客户')
+    if (!nextProductName) throw new Error('请输入产品名称')
 
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
+    if (!user) { setSaving(false); throw new Error('登录已失效') }
 
     const { error } = await supabase.from('sales_records').insert({
       user_id: user.id,
-      customer_id: customerId,
-      product_name: productName.trim(),
-      quantity: parseInt(quantity) || 1,
-      unit_price: unitPrice ? parseFloat(unitPrice) : null,
-      amount: amount ? parseFloat(amount) : null,
+      customer_id: nextCustomerId,
+      product_name: nextProductName,
+      quantity: nextQuantity,
+      unit_price: nextUnitPrice,
+      amount: nextAmount,
       sale_date: new Date().toISOString().slice(0, 10),
-      notes: notes.trim() || null,
+      notes: nextNotes || null,
     })
 
     setSaving(false)
-    if (error) {
-      Alert.alert('保存失败', error.message)
-    } else {
-      reset()
-      onSaved()
+    if (error) throw error
+    reset()
+    onSaved()
+  }
+
+  const handleSave = async () => {
+    try {
+      await saveSales()
+    } catch (error) {
+      Alert.alert('保存失败', error instanceof Error ? error.message : '保存失败')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -114,6 +162,21 @@ function AddSalesModal({
         </View>
 
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+          <View className="mx-4 mt-4">
+            <VoiceInputButton<SalesVoiceFields>
+              formType="sales"
+              title="语音新增销售"
+              scriptLines={[
+                defaultCustomerId ? '产品：净水器滤芯，数量：2，单价：199' : '客户：张三，产品：净水器滤芯，数量：2，单价：199',
+                '金额：398，备注：客户要求周五送货',
+                '金额可不说，系统会按数量和单价计算',
+              ]}
+              disabled={saving}
+              onApply={applyVoiceFields}
+              onSubmit={saveSales}
+            />
+          </View>
+
           {/* 关联客户 */}
           {!defaultCustomerId && (
             <View className="mx-4 mt-4 bg-white rounded-2xl p-4">

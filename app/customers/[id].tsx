@@ -6,6 +6,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { resolveVisitLocation } from '../../lib/location'
+import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type {
   Customer, CustomerType, TrackingMethod, SalesRecord,
 } from '../../types/database'
@@ -42,6 +43,19 @@ type TrackingRecord = {
   customer_locations: { address: string | null } | null
 }
 
+type TrackingVoiceFields = {
+  method?: TrackingMethod | null
+  content?: string | null
+}
+
+type SalesVoiceFields = {
+  product_name?: string | null
+  quantity?: number | null
+  unit_price?: number | null
+  amount?: number | null
+  notes?: string | null
+}
+
 function AddTrackingModal({
   visible, customerId, onClose, onSaved,
 }: {
@@ -54,14 +68,22 @@ function AddTrackingModal({
 
   const handleClose = () => { setMethod('phone'); setContent(''); setGpsStatus(null); onClose() }
 
-  const handleSave = async () => {
-    if (!content.trim()) { Alert.alert('提示', '请输入跟踪内容'); return }
+  const applyVoiceFields = (fields: TrackingVoiceFields) => {
+    if (fields.method) setMethod(fields.method)
+    if (fields.content) setContent(fields.content)
+  }
+
+  const saveTracking = async (fields?: TrackingVoiceFields) => {
+    const nextContent = (fields?.content ?? content).trim()
+    const nextMethod = fields?.method ?? method
+    if (!nextContent) throw new Error('请输入跟踪内容')
+
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
+    if (!user) { setSaving(false); throw new Error('登录已失效') }
 
     let locationId: string | null = null
-    if (method === 'visit') {
+    if (nextMethod === 'visit') {
       setGpsStatus('获取位置中...')
       const loc = await resolveVisitLocation(customerId)
       if (loc) {
@@ -75,15 +97,28 @@ function AddTrackingModal({
     const { error } = await supabase.from('tracking_records').insert({
       user_id: user.id,
       customer_id: customerId,
-      method,
-      content: content.trim(),
+      method: nextMethod,
+      content: nextContent,
       location_id: locationId,
       tracked_at: new Date().toISOString(),
     })
 
     setSaving(false)
-    if (error) { Alert.alert('保存失败', error.message) }
-    else { setMethod('phone'); setContent(''); setGpsStatus(null); onSaved() }
+    if (error) throw error
+    setMethod('phone')
+    setContent('')
+    setGpsStatus(null)
+    onSaved()
+  }
+
+  const handleSave = async () => {
+    try {
+      await saveTracking()
+    } catch (error) {
+      Alert.alert('保存失败', error instanceof Error ? error.message : '保存失败')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -105,6 +140,21 @@ function AddTrackingModal({
           </TouchableOpacity>
         </View>
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+          <View className="mx-4 mt-4">
+            <VoiceInputButton<TrackingVoiceFields>
+              formType="tracking"
+              title="语音新增跟踪"
+              scriptLines={[
+                '跟踪方式：电话 / 微信 / 邮件 / 上门拜访',
+                '跟踪内容：今天沟通了产品方案，对方下周确认预算',
+                '如果是上门拜访，保存时会自动记录当前位置',
+              ]}
+              disabled={saving}
+              onApply={applyVoiceFields}
+              onSubmit={saveTracking}
+            />
+          </View>
+
           <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪方式</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -175,26 +225,52 @@ function AddSalesModal({
   }
   const handleClose = () => { reset(); onClose() }
 
-  const handleSave = async () => {
-    if (!productName.trim()) { Alert.alert('提示', '请输入产品名称'); return }
+  const applyVoiceFields = (fields: SalesVoiceFields) => {
+    if (fields.product_name) setProductName(fields.product_name)
+    if (fields.quantity != null) setQuantity(String(fields.quantity))
+    if (fields.unit_price != null) setUnitPrice(String(fields.unit_price))
+    if (fields.amount != null) setAmount(String(fields.amount))
+    if (fields.notes) setNotes(fields.notes)
+  }
+
+  const saveSales = async (fields?: SalesVoiceFields) => {
+    const nextProductName = (fields?.product_name ?? productName).trim()
+    const nextQuantity = fields?.quantity ?? (parseInt(quantity) || 1)
+    const nextUnitPrice = fields?.unit_price ?? (unitPrice ? parseFloat(unitPrice) : null)
+    const nextAmount = fields?.amount ?? (amount ? parseFloat(amount) : null)
+    const nextNotes = (fields?.notes ?? notes).trim()
+
+    if (!nextProductName) throw new Error('请输入产品名称')
+
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
+    if (!user) { setSaving(false); throw new Error('登录已失效') }
 
     const { error } = await supabase.from('sales_records').insert({
       user_id: user.id,
       customer_id: customerId,
-      product_name: productName.trim(),
-      quantity: parseInt(quantity) || 1,
-      unit_price: unitPrice ? parseFloat(unitPrice) : null,
-      amount: amount ? parseFloat(amount) : null,
+      product_name: nextProductName,
+      quantity: nextQuantity,
+      unit_price: nextUnitPrice,
+      amount: nextAmount,
       sale_date: new Date().toISOString().slice(0, 10),
-      notes: notes.trim() || null,
+      notes: nextNotes || null,
     })
 
     setSaving(false)
-    if (error) { Alert.alert('保存失败', error.message) }
-    else { reset(); onSaved() }
+    if (error) throw error
+    reset()
+    onSaved()
+  }
+
+  const handleSave = async () => {
+    try {
+      await saveSales()
+    } catch (error) {
+      Alert.alert('保存失败', error instanceof Error ? error.message : '保存失败')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -216,6 +292,21 @@ function AddSalesModal({
           </TouchableOpacity>
         </View>
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+          <View className="mx-4 mt-4">
+            <VoiceInputButton<SalesVoiceFields>
+              formType="sales"
+              title="语音新增销售"
+              scriptLines={[
+                '产品：净水器滤芯，数量：2，单价：199',
+                '金额：398，备注：客户要求周五送货',
+                '金额可不说，系统会按数量和单价计算',
+              ]}
+              disabled={saving}
+              onApply={applyVoiceFields}
+              onSubmit={saveSales}
+            />
+          </View>
+
           <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">产品名称 *</Text>

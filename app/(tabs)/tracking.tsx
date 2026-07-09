@@ -7,6 +7,7 @@ import {
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { resolveVisitLocation } from '../../lib/location'
+import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { TrackingMethod } from '../../types/database'
 
 const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: boolean }[] = [
@@ -20,6 +21,12 @@ const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: bool
 const METHOD_MAP = Object.fromEntries(METHODS.map(m => [m.key, m]))
 
 type CustomerOption = { id: string; name: string; company: string | null }
+
+type TrackingVoiceFields = {
+  customer_name?: string | null
+  method?: TrackingMethod | null
+  content?: string | null
+}
 
 type TrackingWithCustomer = {
   id: string
@@ -78,19 +85,44 @@ function AddTrackingModal({
 
   const handleClose = () => { reset(); onClose() }
 
-  const handleSave = async () => {
-    if (!customerId) { Alert.alert('提示', '请选择客户'); return }
-    if (!content.trim()) { Alert.alert('提示', '请输入跟踪内容'); return }
+  const findCustomerId = (name?: string | null) => {
+    if (!name) return ''
+    const text = name.trim()
+    const matched = customers.find(c =>
+      c.name === text ||
+      c.name.includes(text) ||
+      text.includes(c.name) ||
+      (c.company ? text.includes(c.company) : false)
+    )
+    return matched?.id ?? ''
+  }
+
+  const applyVoiceFields = (fields: TrackingVoiceFields) => {
+    if (fields.method) setMethod(fields.method)
+    if (fields.content) setContent(fields.content)
+    if (!defaultCustomerId && fields.customer_name) {
+      const matchedId = findCustomerId(fields.customer_name)
+      if (matchedId) setCustomerId(matchedId)
+    }
+  }
+
+  const saveTracking = async (fields?: TrackingVoiceFields) => {
+    const nextCustomerId = defaultCustomerId || customerId || findCustomerId(fields?.customer_name)
+    const nextContent = (fields?.content ?? content).trim()
+    const nextMethod = fields?.method ?? method
+
+    if (!nextCustomerId) throw new Error('请选择客户')
+    if (!nextContent) throw new Error('请输入跟踪内容')
 
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
+    if (!user) { setSaving(false); throw new Error('登录已失效') }
 
     let locationId: string | null = null
 
-    if (method === 'visit') {
+    if (nextMethod === 'visit') {
       setGpsStatus('获取位置中...')
-      const loc = await resolveVisitLocation(customerId)
+      const loc = await resolveVisitLocation(nextCustomerId)
       if (loc) {
         locationId = loc.locationId
         setGpsStatus(loc.address ? `📍 ${loc.address}` : '📍 已记录位置')
@@ -101,19 +133,26 @@ function AddTrackingModal({
 
     const { error } = await supabase.from('tracking_records').insert({
       user_id: user.id,
-      customer_id: customerId,
-      method,
-      content: content.trim(),
+      customer_id: nextCustomerId,
+      method: nextMethod,
+      content: nextContent,
       location_id: locationId,
       tracked_at: new Date().toISOString(),
     })
 
     setSaving(false)
-    if (error) {
-      Alert.alert('保存失败', error.message)
-    } else {
-      reset()
-      onSaved()
+    if (error) throw error
+    reset()
+    onSaved()
+  }
+
+  const handleSave = async () => {
+    try {
+      await saveTracking()
+    } catch (error) {
+      Alert.alert('保存失败', error instanceof Error ? error.message : '保存失败')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -137,6 +176,21 @@ function AddTrackingModal({
         </View>
 
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+          <View className="mx-4 mt-4">
+            <VoiceInputButton<TrackingVoiceFields>
+              formType="tracking"
+              title="语音新增跟踪"
+              scriptLines={[
+                defaultCustomerId ? '跟踪方式：电话 / 微信 / 邮件 / 上门拜访' : '客户：张三，跟踪方式：电话 / 微信 / 上门拜访',
+                '跟踪内容：今天沟通了产品方案，对方下周确认预算',
+                '如果是上门拜访，保存时会自动记录当前位置',
+              ]}
+              disabled={saving}
+              onApply={applyVoiceFields}
+              onSubmit={saveTracking}
+            />
+          </View>
+
           {/* 跟踪方式 */}
           <View className="mx-4 mt-4 bg-white rounded-2xl p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪方式</Text>
