@@ -227,7 +227,6 @@ function AddTrackingModal({
                 defaultCustomerId ? '跟踪方式：电话 / 微信 / 邮件 / 上门拜访' : '客户：张三，跟踪方式：电话 / 微信 / 上门拜访',
                 '跟踪内容：今天沟通了产品方案，对方下周确认预算',
                 '赠品：试用装，数量：2',
-                '如果是上门拜访，保存时会自动记录当前位置',
               ]}
               disabled={saving}
               submitMode="fill"
