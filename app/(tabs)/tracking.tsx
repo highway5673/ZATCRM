@@ -104,12 +104,12 @@ function AddTrackingModal({
 
   const matchCustomers = useCallback((text: string) => {
     const keyword = text.trim()
-    if (!keyword) return customers.slice(0, 6)
+    if (!keyword) return []
     return customers.filter(c =>
       c.name.includes(keyword) ||
       keyword.includes(c.name) ||
       (c.company ? c.company.includes(keyword) || keyword.includes(c.company) : false)
-    ).slice(0, 6)
+    ).slice(0, 9)
   }, [customers])
 
   const visibleCustomers = useMemo(() => matchCustomers(customerSearch), [customerSearch, matchCustomers])
@@ -289,7 +289,7 @@ function AddTrackingModal({
                       已选择：{selectedCustomer.name}{selectedCustomer.company ? ` · ${selectedCustomer.company}` : ''}
                     </Text>
                   ) : null}
-                  <View className="mt-3">
+                  <View className="mt-3 flex-row flex-wrap gap-2">
                     {visibleCustomers.map(c => (
                       <TouchableOpacity
                         key={c.id}
@@ -297,15 +297,22 @@ function AddTrackingModal({
                           setCustomerId(c.id)
                           setCustomerSearch(c.name)
                         }}
-                        className={`px-3 py-2.5 rounded-lg border mb-2 ${
+                        className={`px-2 py-2.5 rounded-lg border items-center ${
                           customerId === c.id ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
                         }`}
+                        style={{ width: '31%' }}
                       >
-                        <Text className={`text-sm font-medium ${customerId === c.id ? 'text-white' : 'text-gray-700'}`}>
+                        <Text
+                          className={`text-sm font-medium text-center ${customerId === c.id ? 'text-white' : 'text-gray-700'}`}
+                          numberOfLines={1}
+                        >
                           {c.name}
                         </Text>
                         {c.company && (
-                          <Text className={`text-xs mt-0.5 ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                          <Text
+                            className={`text-xs mt-0.5 text-center ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}
+                            numberOfLines={1}
+                          >
                             {c.company}
                           </Text>
                         )}
