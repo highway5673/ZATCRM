@@ -9,21 +9,23 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 const COUNTDOWN_SECONDS = 60
 
-function derivePassword(phone: string) {
-  return `crm_otp_${phone}_2025`
-}
-
 async function callEdgeFn(path: string, body: Record<string, string>) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify(body),
-  })
-  return res.json()
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok && !data.error) return { error: '服务异常，请稍后重试' }
+    return data
+  } catch {
+    return { error: '网络异常，请稍后重试' }
+  }
 }
 
 export default function LoginScreen() {
@@ -101,21 +103,13 @@ export default function LoginScreen() {
       return
     }
 
-    const email = `${normalizedPhone}@crm.internal`
-    const password = derivePassword(normalizedPhone)
-
-    let { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (signInError) {
-      const { error: signUpError } = await supabase.auth.signUp({ email, password })
-      if (signUpError) {
-        setLoading(false)
-        Alert.alert('登录失败', signUpError.message)
-        return
-      }
-      await supabase.auth.signInWithPassword({ email, password })
+    const { error: authError } = await supabase.auth.verifyOtp({
+      type: 'email',
+      token_hash: verifyResult.tokenHash,
+    })
+    if (authError) {
+      Alert.alert('登录失败', authError.message)
     }
-
     setLoading(false)
   }
 

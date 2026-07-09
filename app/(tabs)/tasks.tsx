@@ -8,6 +8,22 @@ import { supabase } from '../../lib/supabase'
 import type { Task, TaskStatus } from '../../types/database'
 
 type CustomerOption = { id: string; name: string }
+type ReminderChoice = 'today' | 'tomorrow' | 'none'
+
+const REMINDER_OPTIONS: { key: ReminderChoice; label: string }[] = [
+  { key: 'today', label: '今天' },
+  { key: 'tomorrow', label: '明天' },
+  { key: 'none', label: '无提醒' },
+]
+
+function getReminderAt(choice: ReminderChoice) {
+  if (choice === 'none') return null
+
+  const date = new Date()
+  if (choice === 'tomorrow') date.setDate(date.getDate() + 1)
+  date.setHours(9, 0, 0, 0)
+  return date.toISOString()
+}
 
 function AddTaskModal({
   visible,
@@ -22,6 +38,7 @@ function AddTaskModal({
   const [notes, setNotes] = useState('')
   const [customerId, setCustomerId] = useState('')
   const [customers, setCustomers] = useState<CustomerOption[]>([])
+  const [reminder, setReminder] = useState<ReminderChoice>('today')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -32,7 +49,7 @@ function AddTaskModal({
     }
   }, [visible])
 
-  const reset = () => { setTitle(''); setNotes(''); setCustomerId('') }
+  const reset = () => { setTitle(''); setNotes(''); setCustomerId(''); setReminder('today') }
   const handleClose = () => { reset(); onClose() }
 
   const handleSave = async () => {
@@ -46,6 +63,7 @@ function AddTaskModal({
       title: title.trim(),
       notes: notes.trim() || null,
       customer_id: customerId || null,
+      remind_at: getReminderAt(reminder),
       status: 'pending' as TaskStatus,
     })
 
@@ -113,6 +131,25 @@ function AddTaskModal({
               ))}
             </View>
           </ScrollView>
+
+          <Text className="text-sm text-gray-500 mb-2">提醒日期</Text>
+          <View className="flex-row bg-gray-100 rounded-xl p-1 mb-4">
+            {REMINDER_OPTIONS.map(option => (
+              <TouchableOpacity
+                key={option.key}
+                onPress={() => setReminder(option.key)}
+                className={`flex-1 py-2 rounded-lg items-center ${
+                  reminder === option.key ? 'bg-white shadow-sm' : ''
+                }`}
+              >
+                <Text className={`text-sm font-medium ${
+                  reminder === option.key ? 'text-gray-800' : 'text-gray-400'
+                }`}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text className="text-sm text-gray-500 mb-1">备注</Text>
           <TextInput

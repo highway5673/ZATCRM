@@ -1,5 +1,5 @@
 import { Redirect, Tabs } from 'expo-router'
-import { Text } from 'react-native'
+import { ActivityIndicator, Text, View } from 'react-native'
 import { useSession } from '../../lib/session'
 
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
@@ -8,6 +8,13 @@ function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
 
 export default function TabsLayout() {
   const session = useSession()
+  if (session === undefined) {
+    return (
+      <View className="flex-1 items-center justify-center bg-[#F2F2F7]">
+        <ActivityIndicator color="#007AFF" />
+      </View>
+    )
+  }
   if (session === null) return <Redirect href="/(auth)/login" />
 
   return (

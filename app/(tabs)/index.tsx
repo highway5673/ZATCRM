@@ -44,8 +44,8 @@ export default function DashboardScreen() {
       supabase.from('customers').select('id', { count: 'exact', head: true }),
       supabase.from('tasks').select('id', { count: 'exact', head: true })
         .eq('status', 'pending')
-        .gte('created_at', todayStart.toISOString())
-        .lte('created_at', todayEnd.toISOString()),
+        .gte('remind_at', todayStart.toISOString())
+        .lte('remind_at', todayEnd.toISOString()),
       supabase.from('tracking_records').select('id', { count: 'exact', head: true })
         .gte('tracked_at', weekFrom).lte('tracked_at', weekTo),
       supabase.from('sales_records').select('amount')
