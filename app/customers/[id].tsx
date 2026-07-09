@@ -76,7 +76,7 @@ function AddTrackingModal({
   const [method, setMethod] = useState<TrackingMethod>('phone')
   const [content, setContent] = useState('')
   const [giftName, setGiftName] = useState('')
-  const [giftQuantity, setGiftQuantity] = useState('1')
+  const [giftQuantity, setGiftQuantity] = useState('0')
   const [saving, setSaving] = useState(false)
   const [gpsStatus, setGpsStatus] = useState<string | null>(null)
 
@@ -84,7 +84,7 @@ function AddTrackingModal({
     setMethod('phone')
     setContent('')
     setGiftName('')
-    setGiftQuantity('1')
+    setGiftQuantity('0')
     setGpsStatus(null)
   }
 
@@ -101,7 +101,7 @@ function AddTrackingModal({
     const nextContent = (fields?.content ?? content).trim()
     const nextMethod = fields?.method ?? method
     const nextGiftName = (fields?.gift_name ?? giftName).trim()
-    const nextGiftQuantity = Math.max(1, fields?.gift_quantity ?? (parseInt(giftQuantity, 10) || 1))
+    const nextGiftQuantity = Math.max(1, fields?.gift_quantity ?? (parseInt(giftQuantity, 10) || 0))
     if (!nextContent) throw new Error('请输入跟踪内容')
 
     setSaving(true)

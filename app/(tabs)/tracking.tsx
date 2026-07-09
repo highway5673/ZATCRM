@@ -77,7 +77,7 @@ function AddTrackingModal({
   const [customerSearch, setCustomerSearch] = useState('')
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [giftName, setGiftName] = useState('')
-  const [giftQuantity, setGiftQuantity] = useState('1')
+  const [giftQuantity, setGiftQuantity] = useState('0')
   const [saving, setSaving] = useState(false)
   const [gpsStatus, setGpsStatus] = useState<string | null>(null)
 
@@ -96,7 +96,7 @@ function AddTrackingModal({
     setCustomerId(defaultCustomerId ?? '')
     setCustomerSearch('')
     setGiftName('')
-    setGiftQuantity('1')
+    setGiftQuantity('0')
     setGpsStatus(null)
   }
 
@@ -143,7 +143,7 @@ function AddTrackingModal({
     const nextContent = (fields?.content ?? content).trim()
     const nextMethod = fields?.method ?? method
     const nextGiftName = (fields?.gift_name ?? giftName).trim()
-    const nextGiftQuantity = Math.max(1, fields?.gift_quantity ?? (parseInt(giftQuantity, 10) || 1))
+    const nextGiftQuantity = Math.max(1, fields?.gift_quantity ?? (parseInt(giftQuantity, 10) || 0))
 
     if (!nextCustomerId) throw new Error('请选择关联客户')
     if (!nextContent) throw new Error('请输入跟踪内容')
