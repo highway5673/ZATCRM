@@ -95,7 +95,7 @@ create table if not exists tracking_gifts (
   id uuid primary key default uuid_generate_v4(),
   tracking_record_id uuid references tracking_records(id) on delete cascade not null,
   name text not null,
-  quantity integer default 1 not null check (quantity > 0),
+  quantity integer default 1 not null check (quantity <> 0),
   created_at timestamptz default now() not null
 );
 

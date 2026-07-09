@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { formatLocationLabel, openNavigation, resolveVisitLocation } from '../../lib/location'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
@@ -42,6 +42,15 @@ type TrackingRecord = {
   location_id: string | null
   customer_locations: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'> | null
   tracking_gifts: { id: string; name: string; quantity: number }[] | null
+}
+
+type TrialItem = {
+  id: string
+  trackingRecordId: string
+  name: string
+  quantity: number
+  content: string
+  trackedAt: string
 }
 
 type TrackingVoiceFields = {
@@ -430,7 +439,7 @@ export default function CustomerDetailScreen() {
   const [loading, setLoading] = useState(true)
   const [showAddTracking, setShowAddTracking] = useState(false)
   const [showAddSales, setShowAddSales] = useState(false)
-  const [activeTab, setActiveTab] = useState<'tracking' | 'sales'>('tracking')
+  const [activeTab, setActiveTab] = useState<'tracking' | 'sales' | 'trials'>('tracking')
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -457,9 +466,9 @@ export default function CustomerDetailScreen() {
     setLoading(false)
   }, [id])
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     fetchAll()
-  }, [fetchAll])
+  }, [fetchAll]))
 
   const handleDelete = () => {
     Alert.alert('删除客户', `确定要删除「${customer?.name}」吗？此操作不可撤销。`, [
@@ -468,6 +477,40 @@ export default function CustomerDetailScreen() {
         text: '删除', style: 'destructive', onPress: async () => {
           await supabase.from('customers').delete().eq('id', id)
           router.back()
+        },
+      },
+    ])
+  }
+
+  const reclaimTrialItem = (item: TrialItem) => {
+    Alert.alert('领回试用物料', `确认领回「${item.name}」x${Math.abs(item.quantity)} 吗？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '领回',
+        onPress: async () => {
+          try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('登录已失效')
+
+            const { data: inserted, error } = await supabase.from('tracking_records').insert({
+              user_id: user.id,
+              customer_id: id,
+              method: 'other',
+              content: `领回试用物料：${item.name}`,
+              tracked_at: new Date().toISOString(),
+            }).select('id').single()
+
+            if (error) throw error
+            const { error: giftError } = await supabase.from('tracking_gifts').insert({
+              tracking_record_id: inserted.id,
+              name: item.name,
+              quantity: -Math.abs(item.quantity),
+            })
+            if (giftError) throw giftError
+            fetchAll()
+          } catch (error) {
+            Alert.alert('领回失败', error instanceof Error ? error.message : '请稍后重试')
+          }
         },
       },
     ])
@@ -492,6 +535,16 @@ export default function CustomerDetailScreen() {
   const typeStyle = TYPE_STYLE[customer.customer_type] ?? TYPE_STYLE['潜在伙伴']
   const avatarColor = AVATAR_COLORS[customer.name.charCodeAt(0) % AVATAR_COLORS.length]
   const totalSales = salesRecords.reduce((s, r) => s + (r.amount ?? 0), 0)
+  const trialItems: TrialItem[] = trackingRecords.flatMap((rec) =>
+    (rec.tracking_gifts ?? []).map((gift) => ({
+      id: gift.id,
+      trackingRecordId: rec.id,
+      name: gift.name,
+      quantity: gift.quantity,
+      content: rec.content,
+      trackedAt: rec.tracked_at,
+    })),
+  )
 
   return (
     <View className="flex-1 bg-[#F2F2F7]">
@@ -501,9 +554,14 @@ export default function CustomerDetailScreen() {
           <Text className="text-2xl text-[#007AFF]">‹</Text>
         </TouchableOpacity>
         <Text className="text-base font-semibold text-gray-800">客户详情</Text>
-        <TouchableOpacity onPress={handleDelete}>
-          <Text className="text-red-400 text-sm">删除</Text>
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-3">
+          <TouchableOpacity onPress={() => router.push(`/customers/${id}/edit`)}>
+            <Text className="text-[#007AFF] text-sm font-semibold">编辑</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete}>
+            <Text className="text-red-400 text-sm">删除</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
@@ -638,6 +696,14 @@ export default function CustomerDetailScreen() {
                 销售记录 {salesRecords.length > 0 ? `(${salesRecords.length})` : ''}
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('trials')}
+              className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'trials' ? 'bg-white' : ''}`}
+            >
+              <Text className={`text-sm font-medium ${activeTab === 'trials' ? 'text-gray-800' : 'text-gray-400'}`}>
+                试用清单 {trialItems.length > 0 ? `(${trialItems.length})` : ''}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -728,6 +794,48 @@ export default function CustomerDetailScreen() {
                   {rec.notes && (
                     <Text className="text-gray-400 text-xs mt-1.5">{rec.notes}</Text>
                   )}
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {/* 试用清单 */}
+        {activeTab === 'trials' && (
+          <View className="mx-4 mt-3 bg-white rounded-lg overflow-hidden">
+            {trialItems.length === 0 ? (
+              <View className="py-10 items-center">
+                <Text className="text-gray-300 text-4xl mb-3">📦</Text>
+                <Text className="text-gray-400 text-sm">暂无试用产品和物料</Text>
+              </View>
+            ) : (
+              trialItems.map((item, index) => (
+                <View key={item.id} className={`px-4 py-3.5 ${index > 0 ? 'border-t border-gray-50' : ''}`}>
+                  <View className="flex-row items-start justify-between">
+                    <View className="flex-1 mr-3">
+                      <Text className="text-gray-800 font-semibold text-sm">{item.name}</Text>
+                      <Text className="text-gray-400 text-xs mt-1" numberOfLines={1}>
+                        {item.content}
+                      </Text>
+                      <Text className="text-gray-300 text-xs mt-0.5">{formatDate(item.trackedAt)}</Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className={`font-bold text-sm ${item.quantity > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                        {item.quantity > 0 ? `+${item.quantity}` : item.quantity}
+                      </Text>
+                      {item.quantity > 0 ? (
+                        <TouchableOpacity
+                          className="mt-2 px-3 py-1.5 rounded-full bg-[#007AFF]"
+                          onPress={() => reclaimTrialItem(item)}
+                          activeOpacity={0.8}
+                        >
+                          <Text className="text-white text-xs font-semibold">领回</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <Text className="text-gray-300 text-xs mt-2">已领回</Text>
+                      )}
+                    </View>
+                  </View>
                 </View>
               ))
             )}
