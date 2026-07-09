@@ -5,10 +5,10 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { resolveVisitLocation } from '../../lib/location'
+import { openNavigation, resolveVisitLocation } from '../../lib/location'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type {
-  Customer, CustomerType, TrackingMethod, SalesRecord,
+  Customer, CustomerLocation, CustomerType, TrackingMethod, SalesRecord,
 } from '../../types/database'
 
 const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: boolean }[] = [
@@ -40,7 +40,7 @@ type TrackingRecord = {
   content: string
   tracked_at: string
   location_id: string | null
-  customer_locations: { address: string | null } | null
+  customer_locations: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'> | null
 }
 
 type TrackingVoiceFields = {
@@ -380,6 +380,7 @@ export default function CustomerDetailScreen() {
   const router = useRouter()
 
   const [customer, setCustomer] = useState<Customer | null>(null)
+  const [customerLocations, setCustomerLocations] = useState<CustomerLocation[]>([])
   const [trackingRecords, setTrackingRecords] = useState<TrackingRecord[]>([])
   const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -389,10 +390,14 @@ export default function CustomerDetailScreen() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const [customerRes, trackingRes, salesRes] = await Promise.all([
+    const [customerRes, locationsRes, trackingRes, salesRes] = await Promise.all([
       supabase.from('customers').select('*').eq('id', id).single(),
+      supabase.from('customer_locations')
+        .select('*')
+        .eq('customer_id', id)
+        .order('created_at', { ascending: false }),
       supabase.from('tracking_records')
-        .select('*, customer_locations(address)')
+        .select('*, customer_locations(address, latitude, longitude)')
         .eq('customer_id', id)
         .order('tracked_at', { ascending: false }),
       supabase.from('sales_records')
@@ -402,6 +407,7 @@ export default function CustomerDetailScreen() {
     ])
 
     if (customerRes.data) setCustomer(customerRes.data)
+    if (locationsRes.data) setCustomerLocations(locationsRes.data)
     if (trackingRes.data) setTrackingRecords(trackingRes.data as unknown as TrackingRecord[])
     if (salesRes.data) setSalesRecords(salesRes.data)
     setLoading(false)
@@ -496,6 +502,41 @@ export default function CustomerDetailScreen() {
           )}
         </View>
 
+        {/* 客户位置 */}
+        <View className="mx-4 mt-3 bg-white rounded-lg overflow-hidden">
+          <View className="px-4 py-3 border-b border-gray-50 flex-row items-center justify-between">
+            <Text className="text-sm font-semibold text-gray-800">客户位置</Text>
+            <Text className="text-xs text-gray-300">{customerLocations.length} 个地址</Text>
+          </View>
+          {customerLocations.length === 0 ? (
+            <View className="px-4 py-4">
+              <Text className="text-gray-400 text-sm">暂无位置记录，上门拜访时会自动记录</Text>
+            </View>
+          ) : (
+            customerLocations.map((loc, index) => (
+              <TouchableOpacity
+                key={loc.id}
+                className={`px-4 py-3.5 flex-row items-center ${index > 0 ? 'border-t border-gray-50' : ''}`}
+                onPress={() => openNavigation(loc.latitude, loc.longitude, loc.address)}
+                activeOpacity={0.75}
+              >
+                <View className="w-9 h-9 rounded-lg bg-blue-50 items-center justify-center mr-3">
+                  <Text className="text-[#007AFF] text-base">⌖</Text>
+                </View>
+                <View className="flex-1 mr-3">
+                  <Text className="text-gray-800 text-sm font-medium" numberOfLines={1}>
+                    {loc.address || '已记录坐标位置'}
+                  </Text>
+                  <Text className="text-gray-300 text-xs mt-0.5">
+                    {loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}
+                  </Text>
+                </View>
+                <Text className="text-[#007AFF] text-sm font-semibold">导航</Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
         {/* 统计栏 */}
         <View className="mx-4 mt-3 flex-row gap-3">
           <View className="flex-1 bg-white rounded-lg px-4 py-3 items-center">
@@ -577,8 +618,23 @@ export default function CustomerDetailScreen() {
                       <Text className="text-xs text-gray-300">{formatDate(rec.tracked_at)}</Text>
                     </View>
                     <Text className="text-gray-700 text-sm leading-5">{rec.content}</Text>
-                    {rec.customer_locations?.address && (
-                      <Text className="text-gray-300 text-xs mt-1.5">📍 {rec.customer_locations.address}</Text>
+                    {rec.customer_locations && rec.method === 'visit' && (
+                      <View className="mt-2 flex-row items-center">
+                        <Text className="text-gray-300 text-xs flex-1 mr-2" numberOfLines={1}>
+                          📍 {rec.customer_locations.address || '拜访位置'}
+                        </Text>
+                        <TouchableOpacity
+                          className="px-2.5 py-1 rounded-full bg-blue-50"
+                          onPress={() => openNavigation(
+                            rec.customer_locations!.latitude,
+                            rec.customer_locations!.longitude,
+                            rec.customer_locations!.address,
+                          )}
+                          activeOpacity={0.75}
+                        >
+                          <Text className="text-[#007AFF] text-xs font-semibold">导航</Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </View>
                 )

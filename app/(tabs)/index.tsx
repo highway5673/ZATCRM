@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 
 function getWeekRange() {
@@ -75,9 +75,9 @@ export default function DashboardScreen() {
     setPhone(email.replace('@crm.internal', ''))
   }, [])
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     fetchStats()
-  }, [fetchStats])
+  }, [fetchStats]))
 
   const handleLogout = () => {
     Alert.alert('退出登录', '确定要退出登录吗？', [

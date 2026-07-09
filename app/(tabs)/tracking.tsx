@@ -6,9 +6,9 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { resolveVisitLocation } from '../../lib/location'
+import { openNavigation, resolveVisitLocation } from '../../lib/location'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
-import type { TrackingMethod } from '../../types/database'
+import type { CustomerLocation, TrackingMethod } from '../../types/database'
 
 const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: boolean }[] = [
   { key: 'visit',  label: '上门拜访', emoji: '🚗', hasGps: true },
@@ -36,7 +36,7 @@ type TrackingWithCustomer = {
   location_id: string | null
   tracked_at: string
   customers: { name: string; company: string | null } | null
-  customer_locations: { address: string | null } | null
+  customer_locations: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'> | null
 }
 
 function formatDate(iso: string) {
@@ -296,9 +296,22 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
         <Text className="text-xs text-gray-300 mt-0.5">{formatDate(item.tracked_at)}</Text>
       </View>
       <Text className="text-gray-600 text-sm leading-5">{item.content}</Text>
-      {item.customer_locations?.address && (
-        <View className="flex-row items-center mt-2 gap-1">
-          <Text className="text-gray-300 text-xs">📍 {item.customer_locations.address}</Text>
+      {item.customer_locations && item.method === 'visit' && (
+        <View className="flex-row items-center mt-2">
+          <Text className="text-gray-300 text-xs flex-1 mr-2" numberOfLines={1}>
+            📍 {item.customer_locations.address || '拜访位置'}
+          </Text>
+          <TouchableOpacity
+            className="px-2.5 py-1 rounded-full bg-blue-50"
+            onPress={() => openNavigation(
+              item.customer_locations!.latitude,
+              item.customer_locations!.longitude,
+              item.customer_locations!.address,
+            )}
+            activeOpacity={0.75}
+          >
+            <Text className="text-[#007AFF] text-xs font-semibold">导航</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -316,7 +329,7 @@ export default function TrackingScreen() {
     setLoading(true)
     const { data, error } = await supabase
       .from('tracking_records')
-      .select('*, customers(name, company), customer_locations(address)')
+      .select('*, customers(name, company), customer_locations(address, latitude, longitude)')
       .order('tracked_at', { ascending: false })
       .limit(100)
 

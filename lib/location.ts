@@ -1,4 +1,6 @@
 import * as ExpoLocation from 'expo-location'
+import * as Linking from 'expo-linking'
+import { Alert, Platform } from 'react-native'
 import { supabase } from './supabase'
 import type { CustomerLocation } from '../types/database'
 
@@ -86,4 +88,18 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
 
   if (error || !inserted) return null
   return { locationId: inserted.id, address, isNew: true }
+}
+
+export function openNavigation(latitude: number, longitude: number, label?: string | null) {
+  const query = encodeURIComponent(label || `${latitude},${longitude}`)
+  const url = Platform.select({
+    ios: `http://maps.apple.com/?daddr=${latitude},${longitude}&q=${query}`,
+    android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${query})`,
+    default: `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`,
+  })
+
+  if (!url) return
+  Linking.openURL(url).catch(() => {
+    Alert.alert('无法打开地图', '请确认手机已安装地图或导航应用')
+  })
 }
