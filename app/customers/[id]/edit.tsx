@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import * as Clipboard from 'expo-clipboard'
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   Text,
@@ -17,6 +20,19 @@ import type { Customer, CustomerType } from '../../../types/database'
 
 const CUSTOMER_TYPES: CustomerType[] = ['潜在伙伴', '客户', '伙伴']
 
+function extractWechatNickname(value: string) {
+  const lines = value
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+
+  const nicknameLine = lines.find(line => /^(微信昵称|昵称|微信名)[:：]/.test(line))
+  if (nicknameLine) return nicknameLine.replace(/^(微信昵称|昵称|微信名)[:：]\s*/, '').trim()
+
+  const nonWechatIdLine = lines.find(line => !/^微信号[:：]/.test(line))
+  return (nonWechatIdLine ?? lines[0] ?? '').trim()
+}
+
 export default function EditCustomerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
@@ -28,6 +44,9 @@ export default function EditCustomerScreen() {
   const [wechat, setWechat] = useState('')
   const [notes, setNotes] = useState('')
   const [customerType, setCustomerType] = useState<CustomerType>('潜在伙伴')
+  const [selectingWechat, setSelectingWechat] = useState(false)
+  const selectingWechatRef = useRef(false)
+  const previousWechatClipboardRef = useRef('')
 
   useEffect(() => {
     trackPerf('customers.edit.load', () =>
@@ -48,6 +67,65 @@ export default function EditCustomerScreen() {
       setLoading(false)
     })
   }, [id, router])
+
+  const pasteWechatNickname = useCallback(async (showResult = true) => {
+    const copiedText = await Clipboard.getStringAsync()
+    if (!showResult && copiedText.trim() === previousWechatClipboardRef.current) {
+      return false
+    }
+
+    const nextWechat = extractWechatNickname(copiedText)
+
+    if (!nextWechat) {
+      if (showResult) {
+        Alert.alert('未读取到微信昵称', '请先在微信中复制昵称，然后回到这里再试。')
+      }
+      return false
+    }
+
+    setWechat(nextWechat)
+    setSelectingWechat(false)
+    selectingWechatRef.current = false
+
+    if (showResult) {
+      Alert.alert('已填入微信昵称', nextWechat)
+    }
+    return true
+  }, [])
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && selectingWechatRef.current) {
+        pasteWechatNickname(false)
+      }
+    })
+
+    return () => subscription.remove()
+  }, [pasteWechatNickname])
+
+  const openWechatForNickname = async () => {
+    previousWechatClipboardRef.current = (await Clipboard.getStringAsync()).trim()
+    selectingWechatRef.current = true
+    setSelectingWechat(true)
+
+    try {
+      await Linking.openURL('weixin://')
+    } catch {
+      Alert.alert('无法打开微信', '请手动打开微信，复制昵称后回到 CRM。')
+    }
+  }
+
+  const handleSelectWechat = () => {
+    Alert.alert(
+      '选择微信昵称',
+      '请在微信中打开对方资料页，复制昵称，然后回到 CRM。回到本页后会自动填入微信昵称。',
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '我已复制，粘贴', onPress: () => pasteWechatNickname() },
+        { text: '打开微信', onPress: openWechatForNickname },
+      ],
+    )
+  }
 
   const save = async () => {
     const nextName = name.trim()
@@ -138,10 +216,22 @@ export default function EditCustomerScreen() {
             />
           </View>
           <View className="px-4 pt-4 pb-2">
-            <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">微信号</Text>
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-xs text-gray-400 uppercase font-semibold">微信昵称</Text>
+              <TouchableOpacity
+                className="rounded-full bg-blue-50 px-3 py-1"
+                onPress={handleSelectWechat}
+                disabled={selectingWechat}
+                activeOpacity={0.75}
+              >
+                <Text className="text-[#007AFF] text-xs font-semibold">
+                  {selectingWechat ? '等待复制' : '选择微信'}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               className="text-base text-gray-900 pb-2"
-              placeholder="请输入微信号"
+              placeholder="输入微信昵称"
               placeholderTextColor="#9CA3AF"
               value={wechat}
               onChangeText={setWechat}
