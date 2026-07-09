@@ -143,6 +143,8 @@ async function parseTranscript(transcript: string, formType: FormType) {
     'method 映射：上门拜访/拜访=visit，电话=phone，微信=wechat，邮件=email，其他=other。',
     'gift_name 是本次提供的赠品或试用装名称，gift_quantity 是对应数量。',
     '销售表单中 unit 是销售单位，例如盒、箱、个、瓶、套；听不到则填 null。',
+    '任务表单中 title 是要完成的任务内容，只保留动作和事项，不要把提醒规则、备注标签混进 title。',
+    '任务表单中 customer_name 只填写关联客户名称；notes 填写执行细节、要求、材料、注意事项。',
     'customer_type 只允许：潜在伙伴、客户、伙伴。',
     'reminder 只允许：today、tomorrow、none。',
     `表单类型：${formType}`,
