@@ -36,6 +36,8 @@ type TrackingGift = {
   quantity: number
 }
 
+type LocationSummary = Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'>
+
 type TrackingWithCustomer = {
   id: string
   customer_id: string
@@ -43,8 +45,8 @@ type TrackingWithCustomer = {
   content: string
   location_id: string | null
   tracked_at: string
-  customers: { name: string; company: string | null } | null
-  customer_locations: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'> | null
+  customers: { name: string; company: string | null; customer_locations?: LocationSummary[] | null } | null
+  customer_locations: LocationSummary | null
   tracking_gifts: TrackingGift[] | null
 }
 
@@ -361,7 +363,11 @@ function AddTrackingModal({
 
 function TrackingCard({ item }: { item: TrackingWithCustomer }) {
   const m = METHOD_MAP[item.method]
-  const locationLabel = item.customer_locations ? formatLocationLabel(item.customer_locations) : ''
+  const savedAddressLocation = item.customers?.customer_locations?.find(loc => loc.address?.trim())
+  const visitLocation = item.customer_locations ?? savedAddressLocation
+  const locationLabel = item.customer_locations?.address?.trim()
+    || savedAddressLocation?.address?.trim()
+    || (visitLocation ? formatLocationLabel(visitLocation) : '')
 
   return (
     <View className="bg-white rounded-lg p-4 mb-3">
@@ -380,7 +386,7 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
         <Text className="text-xs text-gray-300 mt-0.5">{formatDate(item.tracked_at)}</Text>
       </View>
       <Text className="text-gray-600 text-sm leading-5">{item.content}</Text>
-      {item.customer_locations && item.method === 'visit' && (
+      {visitLocation && item.method === 'visit' && (
         <View className="flex-row items-center mt-2">
           <Text className="text-gray-300 text-xs flex-1 mr-2" numberOfLines={1}>
             📍 {locationLabel}
@@ -388,9 +394,9 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
           <TouchableOpacity
             className="px-2.5 py-1 rounded-full bg-blue-50"
             onPress={() => openNavigation(
-              item.customer_locations!.latitude,
-              item.customer_locations!.longitude,
-              item.customer_locations!.address,
+              visitLocation.latitude,
+              visitLocation.longitude,
+              locationLabel,
             )}
             activeOpacity={0.75}
           >
@@ -420,7 +426,7 @@ export default function TrackingScreen() {
     setLoading(true)
     const { data, error } = await supabase
       .from('tracking_records')
-      .select('*, customers(name, company), customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
+      .select('*, customers(name, company, customer_locations(address, latitude, longitude)), customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
       .order('tracked_at', { ascending: false })
       .limit(100)
 
