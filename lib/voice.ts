@@ -1,3 +1,5 @@
+import * as FileSystem from 'expo-file-system/legacy'
+
 import { supabase } from './supabase'
 
 export type VoiceFormType = 'customer' | 'tracking' | 'sales' | 'task'
@@ -22,27 +24,31 @@ export async function parseVoiceFormAudio<T extends VoiceParsedFields>({
   formType,
 }: ParseVoiceOptions): Promise<ParseVoiceResult<T>> {
   const { data: { session } } = await supabase.auth.getSession()
-  const formData = new FormData()
-  formData.append('formType', formType)
-  formData.append('audio', {
-    uri,
-    name: 'voice-form.m4a',
-    type: 'audio/m4a',
-  } as unknown as Blob)
 
-  const res = await fetch(`${supabaseUrl}/functions/v1/parse-voice-form`, {
-    method: 'POST',
+  const res = await FileSystem.uploadAsync(`${supabaseUrl}/functions/v1/parse-voice-form`, uri, {
+    httpMethod: 'POST',
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    fieldName: 'audio',
+    mimeType: 'audio/m4a',
     headers: {
       apikey: supabaseAnonKey,
       Authorization: `Bearer ${session?.access_token ?? supabaseAnonKey}`,
     },
-    body: formData,
+    parameters: { formType },
   })
 
-  const body = await res.json().catch(() => null)
-  if (!res.ok) {
+  const body = parseJson(res.body)
+  if (res.status < 200 || res.status >= 300) {
     throw new Error(body?.error ?? '语音识别失败')
   }
 
   return body as ParseVoiceResult<T>
+}
+
+function parseJson(value: string) {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
 }
