@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, Modal,
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
@@ -41,6 +41,7 @@ function AddSalesModal({
   defaultCustomerId?: string
 }) {
   const [customerId, setCustomerId] = useState(defaultCustomerId ?? '')
+  const [customerSearch, setCustomerSearch] = useState('')
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [productName, setProductName] = useState('')
   const [quantity, setQuantity] = useState('1')
@@ -69,6 +70,7 @@ function AddSalesModal({
 
   const reset = () => {
     setCustomerId(defaultCustomerId ?? '')
+    setCustomerSearch('')
     setProductName('')
     setQuantity('1')
     setUnitPrice('')
@@ -78,7 +80,20 @@ function AddSalesModal({
 
   const handleClose = () => { reset(); onClose() }
 
-  const findCustomerId = (name?: string | null) => {
+  const matchCustomers = useCallback((text: string) => {
+    const keyword = text.trim()
+    if (!keyword) return []
+    return customers.filter(c =>
+      c.name.includes(keyword) ||
+      keyword.includes(c.name) ||
+      (c.company ? c.company.includes(keyword) || keyword.includes(c.company) : false)
+    ).slice(0, 9)
+  }, [customers])
+
+  const visibleCustomers = useMemo(() => matchCustomers(customerSearch), [customerSearch, matchCustomers])
+  const selectedCustomer = customers.find(c => c.id === customerId)
+
+  const findCustomerId = useCallback((name?: string | null) => {
     if (!name) return ''
     const text = name.trim()
     const matched = customers.find(c =>
@@ -88,7 +103,7 @@ function AddSalesModal({
       (c.company ? text.includes(c.company) : false)
     )
     return matched?.id ?? ''
-  }
+  }, [customers])
 
   const applyVoiceFields = (fields: SalesVoiceFields) => {
     if (fields.product_name) setProductName(fields.product_name)
@@ -97,8 +112,8 @@ function AddSalesModal({
     if (fields.amount != null) setAmount(String(fields.amount))
     if (fields.notes) setNotes(fields.notes)
     if (!defaultCustomerId && fields.customer_name) {
-      const matchedId = findCustomerId(fields.customer_name)
-      if (matchedId) setCustomerId(matchedId)
+      setCustomerSearch(fields.customer_name)
+      setCustomerId('')
     }
   }
 
@@ -194,30 +209,56 @@ function AddSalesModal({
               {customers.length === 0 ? (
                 <Text className="text-gray-400 text-sm">请先添加客户</Text>
               ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View className="flex-row gap-2">
-                    {customers.map(c => (
+                <>
+                  <TextInput
+                    className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5"
+                    placeholder="输入客户姓名、公司搜索"
+                    placeholderTextColor="#9CA3AF"
+                    value={customerSearch}
+                    onChangeText={(text) => {
+                      setCustomerSearch(text)
+                      setCustomerId('')
+                    }}
+                  />
+                  {selectedCustomer ? (
+                    <Text className="text-[#007AFF] text-xs mt-2">
+                      已选择：{selectedCustomer.name}{selectedCustomer.company ? ` · ${selectedCustomer.company}` : ''}
+                    </Text>
+                  ) : null}
+                  <View className="mt-3 flex-row flex-wrap gap-2">
+                    {visibleCustomers.map(c => (
                       <TouchableOpacity
                         key={c.id}
-                        onPress={() => setCustomerId(c.id)}
-                        className={`px-3 py-2 rounded-lg border ${
-                          customerId === c.id
-                            ? 'bg-[#007AFF] border-[#007AFF]'
-                            : 'bg-white border-gray-200'
+                        onPress={() => {
+                          setCustomerId(c.id)
+                          setCustomerSearch(c.name)
+                        }}
+                        className={`px-2 py-2.5 rounded-lg border items-center ${
+                          customerId === c.id ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
                         }`}
+                        style={{ width: '31%' }}
                       >
-                        <Text className={`text-sm font-medium ${customerId === c.id ? 'text-white' : 'text-gray-700'}`}>
+                        <Text
+                          className={`text-sm font-medium text-center ${customerId === c.id ? 'text-white' : 'text-gray-700'}`}
+                          numberOfLines={1}
+                        >
                           {c.name}
                         </Text>
                         {c.company && (
-                          <Text className={`text-xs ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                          <Text
+                            className={`text-xs mt-0.5 text-center ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}
+                            numberOfLines={1}
+                          >
                             {c.company}
                           </Text>
                         )}
                       </TouchableOpacity>
                     ))}
+                    {customerSearch && visibleCustomers.length === 0 ? (
+                      <Text className="text-gray-400 text-sm">没有匹配客户，请换个关键词</Text>
+                    ) : null}
                   </View>
-                </ScrollView>
+                </>
               )}
             </View>
           )}
