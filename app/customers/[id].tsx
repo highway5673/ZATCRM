@@ -50,7 +50,7 @@ type TrialItem = {
   trackingRecordId: string
   name: string
   quantity: number
-  content: string
+  notes: string
   trackedAt: string
 }
 
@@ -569,10 +569,14 @@ export default function CustomerDetailScreen() {
       trackingRecordId: rec.id,
       name: gift.name,
       quantity: gift.quantity,
-      content: rec.content,
+      notes: rec.content,
       trackedAt: rec.tracked_at,
     })),
   )
+  const trialBalances = trialItems.reduce<Record<string, number>>((acc, item) => {
+    acc[item.name] = (acc[item.name] ?? 0) + item.quantity
+    return acc
+  }, {})
 
   return (
     <View className="flex-1 bg-[#F2F2F7]">
@@ -704,6 +708,18 @@ export default function CustomerDetailScreen() {
             <Text className="text-white text-sm font-semibold">+ 销售记录</Text>
           </TouchableOpacity>
         </View>
+        <View className="mx-4 mt-3">
+          <TouchableOpacity
+            className="bg-amber-500 rounded-lg py-3 items-center"
+            onPress={() => {
+              setActiveTab('trials')
+              router.push(`/customers/${id}/trial`)
+            }}
+            activeOpacity={0.85}
+          >
+            <Text className="text-white text-sm font-semibold">+ 新增试用</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Tab 切换 */}
         <View className="mx-4 mt-4">
@@ -800,24 +816,20 @@ export default function CustomerDetailScreen() {
             ) : (
               salesRecords.map((rec, i) => (
                 <View key={rec.id} className={`px-4 py-3.5 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
-                  <View className="flex-row items-start justify-between">
-                    <View className="flex-1 mr-3">
-                      <Text className="text-gray-800 font-semibold text-sm">{rec.product_name}</Text>
-                      <View className="flex-row items-center gap-3 mt-1">
-                        <Text className="text-gray-400 text-xs">×{rec.quantity}</Text>
-                        {rec.unit_price != null && (
-                          <Text className="text-gray-400 text-xs">¥{rec.unit_price}/件</Text>
-                        )}
-                      </View>
-                    </View>
-                    <View className="items-end">
-                      {rec.amount != null && (
-                        <Text className="text-green-600 font-bold text-sm">
-                          ¥{rec.amount.toLocaleString('zh-CN')}
-                        </Text>
-                      )}
-                      <Text className="text-gray-300 text-xs mt-0.5">{formatDate(rec.sale_date)}</Text>
-                    </View>
+                  <View className="flex-row items-start justify-between mb-2">
+                    <Text className="text-gray-800 font-semibold text-sm flex-1 mr-3" numberOfLines={2}>
+                      {rec.product_name}
+                    </Text>
+                    <Text className="text-green-600 font-bold text-sm">
+                      合计：¥{(rec.amount ?? ((rec.unit_price ?? 0) * rec.quantity)).toLocaleString('zh-CN')}
+                    </Text>
+                  </View>
+                  <View className="flex-row flex-wrap gap-x-4 gap-y-1">
+                    <Text className="text-gray-400 text-xs">数量：{rec.quantity}</Text>
+                    <Text className="text-gray-400 text-xs">
+                      价格：{rec.unit_price != null ? `¥${rec.unit_price}` : '未填写'}
+                    </Text>
+                    <Text className="text-gray-400 text-xs">日期：{formatDate(rec.sale_date)}</Text>
                   </View>
                   {rec.notes && (
                     <Text className="text-gray-400 text-xs mt-1.5">{rec.notes}</Text>
@@ -837,35 +849,54 @@ export default function CustomerDetailScreen() {
                 <Text className="text-gray-400 text-sm">暂无试用产品和物料</Text>
               </View>
             ) : (
-              trialItems.map((item, index) => (
-                <View key={item.id} className={`px-4 py-3.5 ${index > 0 ? 'border-t border-gray-50' : ''}`}>
-                  <View className="flex-row items-start justify-between">
-                    <View className="flex-1 mr-3">
-                      <Text className="text-gray-800 font-semibold text-sm">{item.name}</Text>
-                      <Text className="text-gray-400 text-xs mt-1" numberOfLines={1}>
-                        {item.content}
-                      </Text>
-                      <Text className="text-gray-300 text-xs mt-0.5">{formatDate(item.trackedAt)}</Text>
-                    </View>
-                    <View className="items-end">
-                      <Text className={`font-bold text-sm ${item.quantity > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
-                        {item.quantity > 0 ? `+${item.quantity}` : item.quantity}
-                      </Text>
-                      {item.quantity > 0 ? (
-                        <TouchableOpacity
-                          className="mt-2 px-3 py-1.5 rounded-full bg-[#007AFF]"
-                          onPress={() => reclaimTrialItem(item)}
-                          activeOpacity={0.8}
-                        >
-                          <Text className="text-white text-xs font-semibold">领回</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <Text className="text-gray-300 text-xs mt-2">已领回</Text>
-                      )}
-                    </View>
+              <>
+                <View className="px-4 py-3 bg-amber-50 border-b border-amber-100">
+                  <Text className="text-amber-700 text-xs font-semibold mb-1.5">当前试用结余</Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {Object.entries(trialBalances).map(([trialName, balance]) => (
+                      <View key={trialName} className="bg-white rounded-full px-2.5 py-1">
+                        <Text className="text-amber-700 text-xs">
+                          {trialName}：{balance}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
-              ))
+                {trialItems.map((item, index) => (
+                  <View key={item.id} className={`px-4 py-3.5 ${index > 0 ? 'border-t border-gray-50' : ''}`}>
+                    <View className="flex-row items-start justify-between">
+                      <View className="flex-1 mr-3">
+                        <Text className="text-gray-800 font-semibold text-sm">{item.name}</Text>
+                        <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-1">
+                          <Text className="text-gray-400 text-xs">
+                            数量：{item.quantity > 0 ? `+${item.quantity}` : item.quantity}
+                          </Text>
+                          <Text className="text-gray-400 text-xs">日期：{formatDate(item.trackedAt)}</Text>
+                        </View>
+                        <Text className="text-gray-400 text-xs mt-1" numberOfLines={2}>
+                          备注：{item.notes || '无'}
+                        </Text>
+                      </View>
+                      <View className="items-end">
+                        <Text className={`font-bold text-sm ${item.quantity > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                          {item.quantity > 0 ? '发出' : '领回'}
+                        </Text>
+                        {item.quantity > 0 ? (
+                          <TouchableOpacity
+                            className="mt-2 px-3 py-1.5 rounded-full bg-[#007AFF]"
+                            onPress={() => reclaimTrialItem(item)}
+                            activeOpacity={0.8}
+                          >
+                            <Text className="text-white text-xs font-semibold">领回</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text className="text-gray-300 text-xs mt-2">已冲抵</Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </>
             )}
           </View>
         )}
