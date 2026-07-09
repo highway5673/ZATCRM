@@ -19,7 +19,7 @@ export default function AddTrialScreen() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('1')
-  const [isReclaim, setIsReclaim] = useState(false)
+  const [unit, setUnit] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -27,6 +27,7 @@ export default function AddTrialScreen() {
     const startedAt = perfNow()
     const nextName = name.trim()
     const parsedQuantity = Math.abs(parseInt(quantity, 10) || 0)
+    const nextUnit = unit.trim()
     const nextNotes = notes.trim()
 
     if (!nextName) {
@@ -45,8 +46,7 @@ export default function AddTrialScreen() {
         supabase.auth.getUser())
       if (!user) throw new Error('登录已失效')
 
-      const signedQuantity = isReclaim ? -parsedQuantity : parsedQuantity
-      const content = nextNotes || `${isReclaim ? '领回' : '新增'}试用：${nextName}`
+      const content = nextNotes || `新增试用：${nextName}`
 
       const { data: inserted, error } = await trackPerf('customerDetail.trial.add.insertRecord', () =>
         supabase.from('tracking_records').insert({
@@ -56,7 +56,7 @@ export default function AddTrialScreen() {
           content,
           tracked_at: new Date().toISOString(),
         }).select('id').single(),
-      { customerId: id, isReclaim })
+      { customerId: id })
 
       if (error) throw error
 
@@ -64,9 +64,10 @@ export default function AddTrialScreen() {
         supabase.from('tracking_gifts').insert({
           tracking_record_id: inserted.id,
           name: nextName,
-          quantity: signedQuantity,
+          quantity: parsedQuantity,
+          unit: nextUnit || null,
         }),
-      { quantity: signedQuantity })
+      { quantity: parsedQuantity, unit: nextUnit || null })
 
       if (giftError) throw giftError
       router.back()
@@ -74,7 +75,7 @@ export default function AddTrialScreen() {
       Alert.alert('保存失败', error instanceof Error ? error.message : '请稍后重试')
     } finally {
       setSaving(false)
-      perfLog('customerDetail.trial.add.total', startedAt, { isReclaim })
+      perfLog('customerDetail.trial.add.total', startedAt)
     }
   }
 
@@ -112,32 +113,25 @@ export default function AddTrialScreen() {
 
           <View className="px-4 pt-4 pb-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">数量 *</Text>
-            <View className="flex-row items-center">
-              <TextInput
-                className="flex-1 text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5 mr-3"
-                placeholder="1"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="number-pad"
-                value={quantity}
-                onChangeText={setQuantity}
-              />
-              <TouchableOpacity
-                className={`flex-row items-center rounded-lg border px-3 py-2.5 ${
-                  isReclaim ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
-                }`}
-                onPress={() => setIsReclaim(prev => !prev)}
-                activeOpacity={0.8}
-              >
-                <View className={`w-5 h-5 rounded border items-center justify-center mr-2 ${
-                  isReclaim ? 'bg-white border-white' : 'border-gray-300'
-                }`}>
-                  {isReclaim ? <Text className="text-[#007AFF] text-xs font-bold">✓</Text> : null}
-                </View>
-                <Text className={`text-sm font-medium ${isReclaim ? 'text-white' : 'text-gray-600'}`}>
-                  领回
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TextInput
+              className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5"
+              placeholder="1"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="number-pad"
+              value={quantity}
+              onChangeText={setQuantity}
+            />
+          </View>
+
+          <View className="px-4 pt-4 pb-4 border-t border-gray-50">
+            <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">单位</Text>
+            <TextInput
+              className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5"
+              placeholder="个、箱、盒"
+              placeholderTextColor="#9CA3AF"
+              value={unit}
+              onChangeText={setUnit}
+            />
           </View>
         </View>
 
@@ -145,7 +139,7 @@ export default function AddTrialScreen() {
           <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
           <TextInput
             className="text-base text-gray-900"
-            placeholder="记录试用说明、领回原因或后续处理"
+            placeholder="记录试用说明或后续处理"
             placeholderTextColor="#9CA3AF"
             multiline
             numberOfLines={5}

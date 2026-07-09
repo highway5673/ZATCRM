@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { formatLocationLabel, openNavigation, resolveVisitLocation } from '../../lib/location'
+import { formatLocationLabel, openNavigation, resolveAddressForCoords, resolveVisitLocation } from '../../lib/location'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type {
@@ -42,7 +42,7 @@ type TrackingRecord = {
   tracked_at: string
   location_id: string | null
   customer_locations: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'> | null
-  tracking_gifts: { id: string; name: string; quantity: number }[] | null
+  tracking_gifts: { id: string; name: string; quantity: number; unit: string | null }[] | null
 }
 
 type TrialItem = {
@@ -50,6 +50,7 @@ type TrialItem = {
   trackingRecordId: string
   name: string
   quantity: number
+  unit: string | null
   notes: string
   trackedAt: string
 }
@@ -64,6 +65,7 @@ type TrackingVoiceFields = {
 type SalesVoiceFields = {
   product_name?: string | null
   quantity?: number | null
+  unit?: string | null
   unit_price?: number | null
   amount?: number | null
   notes?: string | null
@@ -273,6 +275,7 @@ function AddSalesModal({
 }) {
   const [productName, setProductName] = useState('')
   const [quantity, setQuantity] = useState('1')
+  const [unit, setUnit] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
@@ -285,13 +288,14 @@ function AddSalesModal({
   }, [quantity, unitPrice])
 
   const reset = () => {
-    setProductName(''); setQuantity('1'); setUnitPrice(''); setAmount(''); setNotes('')
+    setProductName(''); setQuantity('1'); setUnit(''); setUnitPrice(''); setAmount(''); setNotes('')
   }
   const handleClose = () => { reset(); onClose() }
 
   const applyVoiceFields = (fields: SalesVoiceFields) => {
     if (fields.product_name) setProductName(fields.product_name)
     if (fields.quantity != null) setQuantity(String(fields.quantity))
+    if (fields.unit) setUnit(fields.unit)
     if (fields.unit_price != null) setUnitPrice(String(fields.unit_price))
     if (fields.amount != null) setAmount(String(fields.amount))
     if (fields.notes) setNotes(fields.notes)
@@ -301,6 +305,7 @@ function AddSalesModal({
     const startedAt = perfNow()
     const nextProductName = (fields?.product_name ?? productName).trim()
     const nextQuantity = fields?.quantity ?? (parseInt(quantity) || 1)
+    const nextUnit = (fields?.unit ?? unit).trim()
     const nextUnitPrice = fields?.unit_price ?? (unitPrice ? parseFloat(unitPrice) : null)
     const nextAmount = fields?.amount ?? (amount ? parseFloat(amount) : null)
     const nextNotes = (fields?.notes ?? notes).trim()
@@ -318,12 +323,13 @@ function AddSalesModal({
           customer_id: customerId,
           product_name: nextProductName,
           quantity: nextQuantity,
+          unit: nextUnit || null,
           unit_price: nextUnitPrice,
           amount: nextAmount,
           sale_date: new Date().toISOString().slice(0, 10),
           notes: nextNotes || null,
         }),
-      { quantity: nextQuantity, hasAmount: nextAmount != null })
+      { quantity: nextQuantity, unit: nextUnit || null, hasAmount: nextAmount != null })
 
       setSaving(false)
       if (error) throw error
@@ -368,12 +374,12 @@ function AddSalesModal({
               formType="sales"
               title="语音新增销售"
               scriptLines={[
-                '产品：净水器滤芯，数量：2，单价：199',
-                '金额：398',
+                '产品：净水器滤芯，数量：2，单位：盒，单价：199',
                 '备注：客户要求周五送货',
                 '提示：金额可以不说，系统会根据数量和单价计算；说错了重新说，可以根据提示说慢了也没关系',
               ]}
               disabled={saving}
+              submitMode="fill"
               onApply={applyVoiceFields}
               onSubmit={saveSales}
             />
@@ -401,6 +407,16 @@ function AddSalesModal({
                   keyboardType="number-pad"
                   value={quantity}
                   onChangeText={setQuantity}
+                />
+              </View>
+              <View className="flex-1 px-4 pt-4 pb-2 border-r border-gray-50">
+                <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">单位</Text>
+                <TextInput
+                  className="text-base text-gray-900 pb-2"
+                  placeholder="盒、箱、个"
+                  placeholderTextColor="#9CA3AF"
+                  value={unit}
+                  onChangeText={setUnit}
                 />
               </View>
               <View className="flex-1 px-4 pt-4 pb-2">
@@ -450,6 +466,7 @@ function AddSalesModal({
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+  const resolvingLocationIdsRef = useRef<Set<string>>(new Set())
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [customerLocations, setCustomerLocations] = useState<CustomerLocation[]>([])
@@ -470,7 +487,7 @@ export default function CustomerDetailScreen() {
           .eq('customer_id', id)
           .order('created_at', { ascending: false }),
         supabase.from('tracking_records')
-          .select('*, customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
+          .select('*, customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity, unit)')
           .eq('customer_id', id)
           .order('tracked_at', { ascending: false }),
         supabase.from('sales_records')
@@ -491,6 +508,35 @@ export default function CustomerDetailScreen() {
     fetchAll()
   }, [fetchAll]))
 
+  useEffect(() => {
+    const missingLocations = customerLocations.filter(loc =>
+      !loc.address?.trim() && !resolvingLocationIdsRef.current.has(loc.id))
+
+    if (missingLocations.length === 0) return
+
+    let cancelled = false
+    missingLocations.forEach((loc) => {
+      resolvingLocationIdsRef.current.add(loc.id)
+      void (async () => {
+        const address = await resolveAddressForCoords(loc.latitude, loc.longitude)
+        if (!address || cancelled) return
+
+        setCustomerLocations(prev => prev.map(item =>
+          item.id === loc.id ? { ...item, address } : item))
+        setTrackingRecords(prev => prev.map(record =>
+          record.location_id === loc.id && record.customer_locations
+            ? { ...record, customer_locations: { ...record.customer_locations, address } }
+            : record))
+
+        await trackPerf('customerDetail.location.updateAddress', () =>
+          supabase.from('customer_locations').update({ address }).eq('id', loc.id),
+        { locationId: loc.id })
+      })()
+    })
+
+    return () => { cancelled = true }
+  }, [customerLocations])
+
   const handleDelete = () => {
     Alert.alert('删除客户', `确定要删除「${customer?.name}」吗？此操作不可撤销。`, [
       { text: '取消', style: 'cancel' },
@@ -504,7 +550,7 @@ export default function CustomerDetailScreen() {
   }
 
   const reclaimTrialItem = (item: TrialItem) => {
-    Alert.alert('领回试用物料', `确认领回「${item.name}」x${Math.abs(item.quantity)} 吗？`, [
+    Alert.alert('领回试用物料', `确认领回「${item.name}」x${Math.abs(item.quantity)}${item.unit ?? ''} 吗？`, [
       { text: '取消', style: 'cancel' },
       {
         text: '领回',
@@ -520,10 +566,10 @@ export default function CustomerDetailScreen() {
                 user_id: user.id,
                 customer_id: id,
                 method: 'other',
-                content: `领回试用物料：${item.name}`,
+                content: `领回试用物料：${item.name}${item.unit ? `（${item.unit}）` : ''}`,
                 tracked_at: new Date().toISOString(),
               }).select('id').single(),
-            { itemName: item.name })
+            { itemName: item.name, unit: item.unit })
 
             if (error) throw error
             const { error: giftError } = await trackPerf('customerDetail.trial.reclaim.insertGift', () =>
@@ -531,14 +577,15 @@ export default function CustomerDetailScreen() {
                 tracking_record_id: inserted.id,
                 name: item.name,
                 quantity: -Math.abs(item.quantity),
+                unit: item.unit,
               }),
-            { quantity: -Math.abs(item.quantity) })
+            { quantity: -Math.abs(item.quantity), unit: item.unit })
             if (giftError) throw giftError
             fetchAll()
           } catch (error) {
             Alert.alert('领回失败', error instanceof Error ? error.message : '请稍后重试')
           } finally {
-            perfLog('customerDetail.trial.reclaim.total', startedAt, { itemName: item.name })
+            perfLog('customerDetail.trial.reclaim.total', startedAt, { itemName: item.name, unit: item.unit })
           }
         },
       },
@@ -570,14 +617,34 @@ export default function CustomerDetailScreen() {
       trackingRecordId: rec.id,
       name: gift.name,
       quantity: gift.quantity,
+      unit: gift.unit,
       notes: rec.content,
       trackedAt: rec.tracked_at,
     })),
   )
-  const trialBalances = trialItems.reduce<Record<string, number>>((acc, item) => {
-    acc[item.name] = (acc[item.name] ?? 0) + item.quantity
+  const trialBalances = trialItems.reduce<Record<string, { name: string; unit: string | null; quantity: number }>>((acc, item) => {
+    const key = `${item.name}__${item.unit ?? ''}`
+    acc[key] = acc[key] ?? { name: item.name, unit: item.unit, quantity: 0 }
+    acc[key].quantity += item.quantity
     return acc
   }, {})
+  const trialBalanceList = Object.values(trialBalances)
+  const trialRemainingById: Record<string, number> = {}
+  Object.keys(trialBalances).forEach((key) => {
+    const groupItems = trialItems.filter(item => `${item.name}__${item.unit ?? ''}` === key)
+    let returnedQuantity = groupItems
+      .filter(item => item.quantity < 0)
+      .reduce((sum, item) => sum + Math.abs(item.quantity), 0)
+
+    groupItems
+      .filter(item => item.quantity > 0)
+      .sort((a, b) => new Date(a.trackedAt).getTime() - new Date(b.trackedAt).getTime())
+      .forEach((item) => {
+        const consumed = Math.min(item.quantity, returnedQuantity)
+        trialRemainingById[item.id] = item.quantity - consumed
+        returnedQuantity -= consumed
+      })
+  })
 
   return (
     <View className="flex-1 bg-[#F2F2F7]">
@@ -664,10 +731,10 @@ export default function CustomerDetailScreen() {
                 </View>
                 <View className="flex-1 mr-3">
                   <Text className="text-gray-800 text-sm font-medium" numberOfLines={1}>
-                    {loc.address || '已记录坐标位置'}
+                    {loc.address?.trim() || '正在解析地址'}
                   </Text>
                   <Text className="text-gray-300 text-xs mt-0.5">
-                    {loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}
+                    {loc.address?.trim() ? '点击打开导航' : '地址解析中，稍后自动更新'}
                   </Text>
                 </View>
                 <Text className="text-[#007AFF] text-sm font-semibold">导航</Text>
@@ -799,7 +866,7 @@ export default function CustomerDetailScreen() {
                     {rec.tracking_gifts?.length ? (
                       <View className="mt-2 rounded-lg bg-amber-50 px-3 py-2">
                         <Text className="text-amber-700 text-xs">
-                          赠品：{rec.tracking_gifts.map(gift => `${gift.name} x${gift.quantity}`).join('，')}
+                          赠品：{rec.tracking_gifts.map(gift => `${gift.name} x${gift.quantity}${gift.unit ?? ''}`).join('，')}
                         </Text>
                       </View>
                     ) : null}
@@ -830,7 +897,7 @@ export default function CustomerDetailScreen() {
                     </Text>
                   </View>
                   <View className="flex-row flex-wrap gap-x-4 gap-y-1">
-                    <Text className="text-gray-400 text-xs">数量：{rec.quantity}</Text>
+                    <Text className="text-gray-400 text-xs">数量：{rec.quantity}{rec.unit ?? ''}</Text>
                     <Text className="text-gray-400 text-xs">
                       价格：{rec.unit_price != null ? `¥${rec.unit_price}` : '未填写'}
                     </Text>
@@ -858,49 +925,56 @@ export default function CustomerDetailScreen() {
                 <View className="px-4 py-3 bg-amber-50 border-b border-amber-100">
                   <Text className="text-amber-700 text-xs font-semibold mb-1.5">当前试用结余</Text>
                   <View className="flex-row flex-wrap gap-2">
-                    {Object.entries(trialBalances).map(([trialName, balance]) => (
-                      <View key={trialName} className="bg-white rounded-full px-2.5 py-1">
+                    {trialBalanceList.map(balance => (
+                      <View key={`${balance.name}-${balance.unit ?? ''}`} className="bg-white rounded-full px-2.5 py-1">
                         <Text className="text-amber-700 text-xs">
-                          {trialName}：{balance}
+                          {balance.name}：{balance.quantity}{balance.unit ?? ''}
                         </Text>
                       </View>
                     ))}
                   </View>
                 </View>
-                {trialItems.map((item, index) => (
-                  <View key={item.id} className={`px-4 py-3.5 ${index > 0 ? 'border-t border-gray-50' : ''}`}>
-                    <View className="flex-row items-start justify-between">
-                      <View className="flex-1 mr-3">
-                        <Text className="text-gray-800 font-semibold text-sm">{item.name}</Text>
-                        <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-1">
-                          <Text className="text-gray-400 text-xs">
-                            数量：{item.quantity > 0 ? `+${item.quantity}` : item.quantity}
+                {trialItems.map((item, index) => {
+                  const remainingQuantity = trialRemainingById[item.id] ?? 0
+                  const canReclaim = item.quantity > 0 && remainingQuantity > 0
+
+                  return (
+                    <View key={item.id} className={`px-4 py-3.5 ${index > 0 ? 'border-t border-gray-50' : ''}`}>
+                      <View className="flex-row items-start justify-between">
+                        <View className="flex-1 mr-3">
+                          <Text className="text-gray-800 font-semibold text-sm">{item.name}</Text>
+                          <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-1">
+                            <Text className="text-gray-400 text-xs">
+                              数量：{item.quantity > 0 ? `+${item.quantity}` : item.quantity}{item.unit ?? ''}
+                            </Text>
+                            <Text className="text-gray-400 text-xs">日期：{formatDate(item.trackedAt)}</Text>
+                          </View>
+                          <Text className="text-gray-400 text-xs mt-1" numberOfLines={2}>
+                            备注：{item.notes || '无'}
                           </Text>
-                          <Text className="text-gray-400 text-xs">日期：{formatDate(item.trackedAt)}</Text>
                         </View>
-                        <Text className="text-gray-400 text-xs mt-1" numberOfLines={2}>
-                          备注：{item.notes || '无'}
-                        </Text>
-                      </View>
-                      <View className="items-end">
-                        <Text className={`font-bold text-sm ${item.quantity > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
-                          {item.quantity > 0 ? '发出' : '领回'}
-                        </Text>
-                        {item.quantity > 0 ? (
-                          <TouchableOpacity
-                            className="mt-2 px-3 py-1.5 rounded-full bg-[#007AFF]"
-                            onPress={() => reclaimTrialItem(item)}
-                            activeOpacity={0.8}
-                          >
-                            <Text className="text-white text-xs font-semibold">领回</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <Text className="text-gray-300 text-xs mt-2">已冲抵</Text>
-                        )}
+                        <View className="items-end">
+                          <Text className={`font-bold text-sm ${item.quantity > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                            {item.quantity > 0 ? '发出' : '领回'}
+                          </Text>
+                          {canReclaim ? (
+                            <TouchableOpacity
+                              className="mt-2 px-3 py-1.5 rounded-full bg-[#007AFF]"
+                              onPress={() => reclaimTrialItem({ ...item, quantity: remainingQuantity })}
+                              activeOpacity={0.8}
+                            >
+                              <Text className="text-white text-xs font-semibold">领回</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <Text className="text-gray-300 text-xs mt-2">
+                              {item.quantity > 0 ? '已领回' : '已冲抵'}
+                            </Text>
+                          )}
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
+                  )
+                })}
               </>
             )}
           </View>

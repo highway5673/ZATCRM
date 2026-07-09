@@ -52,6 +52,10 @@ async function reverseGeocode(lat: number, lon: number): Promise<string | null> 
   }
 }
 
+export async function resolveAddressForCoords(lat: number, lon: number): Promise<string | null> {
+  return reverseGeocode(lat, lon)
+}
+
 export type LocationResult =
   | { locationId: string; address: string | null; isNew: boolean }
   | null
@@ -121,5 +125,5 @@ export function openNavigation(latitude: number, longitude: number, label?: stri
 export function formatLocationLabel(location: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'>) {
   const address = location.address?.trim()
   if (address) return address
-  return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+  return '正在解析地址'
 }

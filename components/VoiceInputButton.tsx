@@ -43,6 +43,7 @@ const FIELD_LABELS: Record<string, string> = {
   quantity: '数量',
   unit_price: '单价',
   amount: '金额',
+  unit: '单位',
   title: '标题',
   reminder: '提醒',
 }
@@ -68,6 +69,8 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
     const seconds = Math.floor((recorderState.durationMillis ?? 0) / 1000)
     return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
   }, [recorderState.durationMillis])
+  const spokenLines = scriptLines.filter(line => !line.trim().startsWith('提示：'))
+  const hintLines = scriptLines.filter(line => line.trim().startsWith('提示：'))
 
   const reset = () => {
     setStatus('按下录音后，照着格式说即可')
@@ -196,10 +199,15 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
                 </View>
               </View>
 
-              {scriptLines.map((line, index) => (
+              {spokenLines.map((line, index) => (
                 <View key={line} className="flex-row bg-white/10 rounded-lg px-3 py-3 mb-2">
                   <Text className="text-[#64D2FF] text-base font-semibold mr-2">{index + 1}</Text>
                   <Text className="text-white text-lg leading-7 flex-1">{line}</Text>
+                </View>
+              ))}
+              {hintLines.map(line => (
+                <View key={line} className="bg-[#64D2FF]/10 rounded-lg px-3 py-3 mb-2">
+                  <Text className="text-[#BCEBFF] text-sm leading-5">{line}</Text>
                 </View>
               ))}
 

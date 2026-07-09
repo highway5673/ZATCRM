@@ -96,6 +96,7 @@ create table if not exists tracking_gifts (
   tracking_record_id uuid references tracking_records(id) on delete cascade not null,
   name text not null,
   quantity integer default 1 not null check (quantity <> 0),
+  unit text,
   created_at timestamptz default now() not null
 );
 
@@ -108,6 +109,7 @@ create table if not exists sales_records (
   user_id uuid references auth.users(id) on delete cascade not null,
   product_name text not null,
   quantity integer default 1 not null,
+  unit text,
   unit_price numeric(12, 2),
   amount numeric(12, 2),
   sale_date date default current_date not null,

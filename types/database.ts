@@ -52,6 +52,7 @@ export type TrackingGift = {
   tracking_record_id: string
   name: string
   quantity: number
+  unit: string | null
   created_at: string
 }
 
@@ -61,6 +62,7 @@ export type SalesRecord = {
   user_id: string
   product_name: string
   quantity: number
+  unit: string | null
   unit_price: number | null
   amount: number | null
   sale_date: string
@@ -148,6 +150,7 @@ type TrackingGiftInsert = {
   tracking_record_id: string
   name: string
   quantity?: number
+  unit?: string | null
 }
 
 type SalesInsert = {
@@ -155,6 +158,7 @@ type SalesInsert = {
   customer_id: string
   product_name: string
   quantity?: number
+  unit?: string | null
   unit_price?: number | null
   amount?: number | null
   sale_date?: string

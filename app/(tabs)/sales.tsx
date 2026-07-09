@@ -15,6 +15,7 @@ type SalesVoiceFields = {
   customer_name?: string | null
   product_name?: string | null
   quantity?: number | null
+  unit?: string | null
   unit_price?: number | null
   amount?: number | null
   notes?: string | null
@@ -45,6 +46,7 @@ function AddSalesModal({
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [productName, setProductName] = useState('')
   const [quantity, setQuantity] = useState('1')
+  const [unit, setUnit] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
@@ -73,6 +75,7 @@ function AddSalesModal({
     setCustomerSearch('')
     setProductName('')
     setQuantity('1')
+    setUnit('')
     setUnitPrice('')
     setAmount('')
     setNotes('')
@@ -108,6 +111,7 @@ function AddSalesModal({
   const applyVoiceFields = (fields: SalesVoiceFields) => {
     if (fields.product_name) setProductName(fields.product_name)
     if (fields.quantity != null) setQuantity(String(fields.quantity))
+    if (fields.unit) setUnit(fields.unit)
     if (fields.unit_price != null) setUnitPrice(String(fields.unit_price))
     if (fields.amount != null) setAmount(String(fields.amount))
     if (fields.notes) setNotes(fields.notes)
@@ -122,6 +126,7 @@ function AddSalesModal({
     const nextCustomerId = defaultCustomerId || customerId || findCustomerId(fields?.customer_name)
     const nextProductName = (fields?.product_name ?? productName).trim()
     const nextQuantity = fields?.quantity ?? (parseInt(quantity) || 1)
+    const nextUnit = (fields?.unit ?? unit).trim()
     const nextUnitPrice = fields?.unit_price ?? (unitPrice ? parseFloat(unitPrice) : null)
     const nextAmount = fields?.amount ?? (amount ? parseFloat(amount) : null)
     const nextNotes = (fields?.notes ?? notes).trim()
@@ -140,12 +145,13 @@ function AddSalesModal({
           customer_id: nextCustomerId,
           product_name: nextProductName,
           quantity: nextQuantity,
+          unit: nextUnit || null,
           unit_price: nextUnitPrice,
           amount: nextAmount,
           sale_date: new Date().toISOString().slice(0, 10),
           notes: nextNotes || null,
         }),
-      { quantity: nextQuantity, hasAmount: nextAmount != null })
+      { quantity: nextQuantity, unit: nextUnit || null, hasAmount: nextAmount != null })
 
       setSaving(false)
       if (error) throw error
@@ -191,12 +197,12 @@ function AddSalesModal({
               formType="sales"
               title="语音新增销售"
               scriptLines={[
-                defaultCustomerId ? '产品：净水器滤芯，数量：2，单价：199' : '客户：张三，产品：净水器滤芯，数量：2，单价：199',
-                '金额：398',
+                defaultCustomerId ? '产品：净水器滤芯，数量：2，单位：盒，单价：199' : '客户：张三，产品：净水器滤芯，数量：2，单位：盒，单价：199',
                 '备注：客户要求周五送货',
                 '提示：金额可以不说，系统会根据数量和单价计算；说错了重新说，可以根据提示说慢了也没关系',
               ]}
               disabled={saving}
+              submitMode="fill"
               onApply={applyVoiceFields}
               onSubmit={saveSales}
             />
@@ -287,6 +293,16 @@ function AddSalesModal({
                   onChangeText={setQuantity}
                 />
               </View>
+              <View className="flex-1 px-4 pt-4 pb-2 border-r border-gray-50">
+                <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">单位</Text>
+                <TextInput
+                  className="text-base text-gray-900 pb-2"
+                  placeholder="盒、箱、个"
+                  placeholderTextColor="#9CA3AF"
+                  value={unit}
+                  onChangeText={setUnit}
+                />
+              </View>
               <View className="flex-1 px-4 pt-4 pb-2">
                 <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">单价（元）</Text>
                 <TextInput
@@ -351,7 +367,7 @@ function SalesCard({ item }: { item: SalesWithCustomer }) {
         )}
       </View>
       <View className="flex-row items-center gap-4 mt-2">
-        <Text className="text-gray-400 text-xs">数量：{item.quantity}</Text>
+        <Text className="text-gray-400 text-xs">数量：{item.quantity}{item.unit ?? ''}</Text>
         {item.unit_price != null && (
           <Text className="text-gray-400 text-xs">单价：¥{item.unit_price}</Text>
         )}
