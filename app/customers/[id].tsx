@@ -41,11 +41,14 @@ type TrackingRecord = {
   tracked_at: string
   location_id: string | null
   customer_locations: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'> | null
+  tracking_gifts: { id: string; name: string; quantity: number }[] | null
 }
 
 type TrackingVoiceFields = {
   method?: TrackingMethod | null
   content?: string | null
+  gift_name?: string | null
+  gift_quantity?: number | null
 }
 
 type SalesVoiceFields = {
@@ -63,19 +66,33 @@ function AddTrackingModal({
 }) {
   const [method, setMethod] = useState<TrackingMethod>('phone')
   const [content, setContent] = useState('')
+  const [giftName, setGiftName] = useState('')
+  const [giftQuantity, setGiftQuantity] = useState('1')
   const [saving, setSaving] = useState(false)
   const [gpsStatus, setGpsStatus] = useState<string | null>(null)
 
-  const handleClose = () => { setMethod('phone'); setContent(''); setGpsStatus(null); onClose() }
+  const reset = () => {
+    setMethod('phone')
+    setContent('')
+    setGiftName('')
+    setGiftQuantity('1')
+    setGpsStatus(null)
+  }
+
+  const handleClose = () => { reset(); onClose() }
 
   const applyVoiceFields = (fields: TrackingVoiceFields) => {
     if (fields.method) setMethod(fields.method)
     if (fields.content) setContent(fields.content)
+    if (fields.gift_name) setGiftName(fields.gift_name)
+    if (fields.gift_quantity != null) setGiftQuantity(String(fields.gift_quantity))
   }
 
   const saveTracking = async (fields?: TrackingVoiceFields) => {
     const nextContent = (fields?.content ?? content).trim()
     const nextMethod = fields?.method ?? method
+    const nextGiftName = (fields?.gift_name ?? giftName).trim()
+    const nextGiftQuantity = Math.max(1, fields?.gift_quantity ?? (parseInt(giftQuantity, 10) || 1))
     if (!nextContent) throw new Error('请输入跟踪内容')
 
     setSaving(true)
@@ -94,20 +111,27 @@ function AddTrackingModal({
       }
     }
 
-    const { error } = await supabase.from('tracking_records').insert({
+    const { data: inserted, error } = await supabase.from('tracking_records').insert({
       user_id: user.id,
       customer_id: customerId,
       method: nextMethod,
       content: nextContent,
       location_id: locationId,
       tracked_at: new Date().toISOString(),
-    })
+    }).select('id').single()
+
+    if (error) throw error
+    if (nextGiftName && inserted) {
+      const { error: giftError } = await supabase.from('tracking_gifts').insert({
+        tracking_record_id: inserted.id,
+        name: nextGiftName,
+        quantity: nextGiftQuantity,
+      })
+      if (giftError) throw giftError
+    }
 
     setSaving(false)
-    if (error) throw error
-    setMethod('phone')
-    setContent('')
-    setGpsStatus(null)
+    reset()
     onSaved()
   }
 
@@ -147,9 +171,11 @@ function AddTrackingModal({
               scriptLines={[
                 '跟踪方式：电话 / 微信 / 邮件 / 上门拜访',
                 '跟踪内容：今天沟通了产品方案，对方下周确认预算',
+                '赠品：试用装，数量：2',
                 '如果是上门拜访，保存时会自动记录当前位置',
               ]}
               disabled={saving}
+              submitMode="fill"
               onApply={applyVoiceFields}
               onSubmit={saveTracking}
             />
@@ -180,6 +206,24 @@ function AddTrackingModal({
                 {gpsStatus ?? '保存时将自动记录GPS位置'}
               </Text>
             )}
+          </View>
+          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+            <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">赠品 / 试用装</Text>
+            <TextInput
+              className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5 mb-3"
+              placeholder="赠品名称，例如试用装"
+              placeholderTextColor="#9CA3AF"
+              value={giftName}
+              onChangeText={setGiftName}
+            />
+            <TextInput
+              className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5"
+              placeholder="数量"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="number-pad"
+              value={giftQuantity}
+              onChangeText={setGiftQuantity}
+            />
           </View>
           <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪内容 *</Text>
@@ -397,7 +441,7 @@ export default function CustomerDetailScreen() {
         .eq('customer_id', id)
         .order('created_at', { ascending: false }),
       supabase.from('tracking_records')
-        .select('*, customer_locations(address, latitude, longitude)')
+        .select('*, customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
         .eq('customer_id', id)
         .order('tracked_at', { ascending: false }),
       supabase.from('sales_records')
@@ -636,6 +680,13 @@ export default function CustomerDetailScreen() {
                         </TouchableOpacity>
                       </View>
                     )}
+                    {rec.tracking_gifts?.length ? (
+                      <View className="mt-2 rounded-lg bg-amber-50 px-3 py-2">
+                        <Text className="text-amber-700 text-xs">
+                          赠品：{rec.tracking_gifts.map(gift => `${gift.name} x${gift.quantity}`).join('，')}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 )
               })

@@ -23,6 +23,7 @@ type VoiceInputButtonProps<T extends VoiceParsedFields> = {
   scriptLines: string[]
   onApply: (fields: T) => void
   onSubmit: (fields: T) => Promise<void>
+  submitMode?: 'fill' | 'submit'
   disabled?: boolean
 }
 
@@ -36,6 +37,8 @@ const FIELD_LABELS: Record<string, string> = {
   customer_name: '客户',
   method: '方式',
   content: '内容',
+  gift_name: '赠品',
+  gift_quantity: '赠品数量',
   product_name: '产品',
   quantity: '数量',
   unit_price: '单价',
@@ -50,6 +53,7 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
   scriptLines,
   onApply,
   onSubmit,
+  submitMode = 'submit',
   disabled,
 }: VoiceInputButtonProps<T>) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
@@ -116,7 +120,7 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
       const result = await parseVoiceFormAudio<T>({ uri, formType })
       setTranscript(result.transcript)
       setFields(result.fields)
-      setStatus('已整理好，可以确认提交')
+      setStatus(submitMode === 'fill' ? '已整理好，可以填入表单后检查修改' : '已整理好，可以确认提交')
     } catch (error) {
       setStatus('识别失败，请重试')
       Alert.alert('识别失败', error instanceof Error ? error.message : '语音识别失败')
@@ -130,6 +134,11 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
     try {
       setBusy(true)
       onApply(fields)
+      if (submitMode === 'fill') {
+        setVisible(false)
+        reset()
+        return
+      }
       await onSubmit(fields)
       setVisible(false)
       reset()
@@ -233,7 +242,9 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
                   {busy ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text className="text-white text-base font-semibold">填入并提交</Text>
+                    <Text className="text-white text-base font-semibold">
+                      {submitMode === 'fill' ? '填入表单' : '填入并提交'}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </View>

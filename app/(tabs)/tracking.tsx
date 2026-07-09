@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, Modal,
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
@@ -26,6 +26,14 @@ type TrackingVoiceFields = {
   customer_name?: string | null
   method?: TrackingMethod | null
   content?: string | null
+  gift_name?: string | null
+  gift_quantity?: number | null
+}
+
+type TrackingGift = {
+  id: string
+  name: string
+  quantity: number
 }
 
 type TrackingWithCustomer = {
@@ -37,6 +45,7 @@ type TrackingWithCustomer = {
   tracked_at: string
   customers: { name: string; company: string | null } | null
   customer_locations: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'> | null
+  tracking_gifts: TrackingGift[] | null
 }
 
 function formatDate(iso: string) {
@@ -63,7 +72,10 @@ function AddTrackingModal({
   const [method, setMethod] = useState<TrackingMethod>('phone')
   const [content, setContent] = useState('')
   const [customerId, setCustomerId] = useState(defaultCustomerId ?? '')
+  const [customerSearch, setCustomerSearch] = useState('')
   const [customers, setCustomers] = useState<CustomerOption[]>([])
+  const [giftName, setGiftName] = useState('')
+  const [giftQuantity, setGiftQuantity] = useState('1')
   const [saving, setSaving] = useState(false)
   const [gpsStatus, setGpsStatus] = useState<string | null>(null)
 
@@ -80,12 +92,28 @@ function AddTrackingModal({
     setMethod('phone')
     setContent('')
     setCustomerId(defaultCustomerId ?? '')
+    setCustomerSearch('')
+    setGiftName('')
+    setGiftQuantity('1')
     setGpsStatus(null)
   }
 
   const handleClose = () => { reset(); onClose() }
 
-  const findCustomerId = (name?: string | null) => {
+  const matchCustomers = useCallback((text: string) => {
+    const keyword = text.trim()
+    if (!keyword) return customers.slice(0, 6)
+    return customers.filter(c =>
+      c.name.includes(keyword) ||
+      keyword.includes(c.name) ||
+      (c.company ? c.company.includes(keyword) || keyword.includes(c.company) : false)
+    ).slice(0, 6)
+  }, [customers])
+
+  const visibleCustomers = useMemo(() => matchCustomers(customerSearch), [customerSearch, matchCustomers])
+  const selectedCustomer = customers.find(c => c.id === customerId)
+
+  const findCustomerId = useCallback((name?: string | null) => {
     if (!name) return ''
     const text = name.trim()
     const matched = customers.find(c =>
@@ -95,14 +123,16 @@ function AddTrackingModal({
       (c.company ? text.includes(c.company) : false)
     )
     return matched?.id ?? ''
-  }
+  }, [customers])
 
   const applyVoiceFields = (fields: TrackingVoiceFields) => {
     if (fields.method) setMethod(fields.method)
     if (fields.content) setContent(fields.content)
+    if (fields.gift_name) setGiftName(fields.gift_name)
+    if (fields.gift_quantity != null) setGiftQuantity(String(fields.gift_quantity))
     if (!defaultCustomerId && fields.customer_name) {
-      const matchedId = findCustomerId(fields.customer_name)
-      if (matchedId) setCustomerId(matchedId)
+      setCustomerSearch(fields.customer_name)
+      setCustomerId('')
     }
   }
 
@@ -110,8 +140,10 @@ function AddTrackingModal({
     const nextCustomerId = defaultCustomerId || customerId || findCustomerId(fields?.customer_name)
     const nextContent = (fields?.content ?? content).trim()
     const nextMethod = fields?.method ?? method
+    const nextGiftName = (fields?.gift_name ?? giftName).trim()
+    const nextGiftQuantity = Math.max(1, fields?.gift_quantity ?? (parseInt(giftQuantity, 10) || 1))
 
-    if (!nextCustomerId) throw new Error('请选择客户')
+    if (!nextCustomerId) throw new Error('请选择关联客户')
     if (!nextContent) throw new Error('请输入跟踪内容')
 
     setSaving(true)
@@ -131,17 +163,26 @@ function AddTrackingModal({
       }
     }
 
-    const { error } = await supabase.from('tracking_records').insert({
+    const { data: inserted, error } = await supabase.from('tracking_records').insert({
       user_id: user.id,
       customer_id: nextCustomerId,
       method: nextMethod,
       content: nextContent,
       location_id: locationId,
       tracked_at: new Date().toISOString(),
-    })
+    }).select('id').single()
+
+    if (error) throw error
+    if (nextGiftName && inserted) {
+      const { error: giftError } = await supabase.from('tracking_gifts').insert({
+        tracking_record_id: inserted.id,
+        name: nextGiftName,
+        quantity: nextGiftQuantity,
+      })
+      if (giftError) throw giftError
+    }
 
     setSaving(false)
-    if (error) throw error
     reset()
     onSaved()
   }
@@ -183,9 +224,11 @@ function AddTrackingModal({
               scriptLines={[
                 defaultCustomerId ? '跟踪方式：电话 / 微信 / 邮件 / 上门拜访' : '客户：张三，跟踪方式：电话 / 微信 / 上门拜访',
                 '跟踪内容：今天沟通了产品方案，对方下周确认预算',
+                '赠品：试用装，数量：2',
                 '如果是上门拜访，保存时会自动记录当前位置',
               ]}
               disabled={saving}
+              submitMode="fill"
               onApply={applyVoiceFields}
               onSubmit={saveTracking}
             />
@@ -228,33 +271,72 @@ function AddTrackingModal({
               {customers.length === 0 ? (
                 <Text className="text-gray-400 text-sm">请先在客户页添加客户</Text>
               ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View className="flex-row gap-2">
-                    {customers.map(c => (
+                <>
+                  <TextInput
+                    className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5"
+                    placeholder="输入客户姓名、公司搜索"
+                    placeholderTextColor="#9CA3AF"
+                    value={customerSearch}
+                    onChangeText={(text) => {
+                      setCustomerSearch(text)
+                      setCustomerId('')
+                    }}
+                  />
+                  {selectedCustomer ? (
+                    <Text className="text-[#007AFF] text-xs mt-2">
+                      已选择：{selectedCustomer.name}{selectedCustomer.company ? ` · ${selectedCustomer.company}` : ''}
+                    </Text>
+                  ) : null}
+                  <View className="mt-3">
+                    {visibleCustomers.map(c => (
                       <TouchableOpacity
                         key={c.id}
-                        onPress={() => setCustomerId(c.id)}
-                        className={`px-3 py-2 rounded-lg border ${
-                          customerId === c.id
-                            ? 'bg-[#007AFF] border-[#007AFF]'
-                            : 'bg-white border-gray-200'
+                        onPress={() => {
+                          setCustomerId(c.id)
+                          setCustomerSearch(c.name)
+                        }}
+                        className={`px-3 py-2.5 rounded-lg border mb-2 ${
+                          customerId === c.id ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
                         }`}
                       >
                         <Text className={`text-sm font-medium ${customerId === c.id ? 'text-white' : 'text-gray-700'}`}>
                           {c.name}
                         </Text>
                         {c.company && (
-                          <Text className={`text-xs ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                          <Text className={`text-xs mt-0.5 ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}>
                             {c.company}
                           </Text>
                         )}
                       </TouchableOpacity>
                     ))}
+                    {customerSearch && visibleCustomers.length === 0 ? (
+                      <Text className="text-gray-400 text-sm">没有匹配客户，请换个关键词</Text>
+                    ) : null}
                   </View>
-                </ScrollView>
+                </>
               )}
             </View>
           )}
+
+          {/* 赠品 */}
+          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+            <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">赠品 / 试用装</Text>
+            <TextInput
+              className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5 mb-3"
+              placeholder="赠品名称，例如试用装"
+              placeholderTextColor="#9CA3AF"
+              value={giftName}
+              onChangeText={setGiftName}
+            />
+            <TextInput
+              className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5"
+              placeholder="数量"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="number-pad"
+              value={giftQuantity}
+              onChangeText={setGiftQuantity}
+            />
+          </View>
 
           {/* 跟踪内容 */}
           <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
@@ -314,6 +396,13 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
           </TouchableOpacity>
         </View>
       )}
+      {item.tracking_gifts?.length ? (
+        <View className="mt-2 rounded-lg bg-amber-50 px-3 py-2">
+          <Text className="text-amber-700 text-xs">
+            赠品：{item.tracking_gifts.map(gift => `${gift.name} x${gift.quantity}`).join('，')}
+          </Text>
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -329,7 +418,7 @@ export default function TrackingScreen() {
     setLoading(true)
     const { data, error } = await supabase
       .from('tracking_records')
-      .select('*, customers(name, company), customer_locations(address, latitude, longitude)')
+      .select('*, customers(name, company), customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
       .order('tracked_at', { ascending: false })
       .limit(100)
 

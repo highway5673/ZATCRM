@@ -134,6 +134,7 @@ function AddCustomerModal({
                 '客户类型：潜在伙伴 / 客户 / 伙伴，备注：需要重点跟进',
               ]}
               disabled={saving}
+              submitMode="fill"
               onApply={applyVoiceFields}
               onSubmit={saveCustomer}
             />

@@ -32,6 +32,8 @@ const FORM_SCHEMAS = {
       customer_name: { type: ['string', 'null'] },
       method: { type: ['string', 'null'], enum: ['visit', 'phone', 'wechat', 'email', 'other', null] },
       content: { type: ['string', 'null'] },
+      gift_name: { type: ['string', 'null'] },
+      gift_quantity: { type: ['number', 'null'] },
     },
   },
   sales: {
@@ -138,6 +140,7 @@ async function parseTranscript(transcript: string, formType: FormType) {
     `请从中文口语内容中提取字段，只返回这些字段的 JSON：${Object.keys(FORM_SCHEMAS[formType].properties).join('、')}。`,
     '没有听到的字段填 null，不要编造。',
     'method 映射：上门拜访/拜访=visit，电话=phone，微信=wechat，邮件=email，其他=other。',
+    'gift_name 是本次提供的赠品或试用装名称，gift_quantity 是对应数量。',
     'customer_type 只允许：潜在伙伴、客户、伙伴。',
     'reminder 只允许：today、tomorrow、none。',
     `表单类型：${formType}`,

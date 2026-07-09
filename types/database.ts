@@ -47,6 +47,14 @@ export type TrackingRecord = {
   created_at: string
 }
 
+export type TrackingGift = {
+  id: string
+  tracking_record_id: string
+  name: string
+  quantity: number
+  created_at: string
+}
+
 export type SalesRecord = {
   id: string
   customer_id: string
@@ -136,6 +144,12 @@ type TrackingInsert = {
   tracked_at?: string
 }
 
+type TrackingGiftInsert = {
+  tracking_record_id: string
+  name: string
+  quantity?: number
+}
+
 type SalesInsert = {
   user_id: string
   customer_id: string
@@ -217,6 +231,12 @@ export type Database = {
         Row: TrackingRecord
         Insert: TrackingInsert
         Update: Partial<TrackingInsert>
+        Relationships: GRelationship[]
+      }
+      tracking_gifts: {
+        Row: TrackingGift
+        Insert: TrackingGiftInsert
+        Update: Partial<TrackingGiftInsert>
         Relationships: GRelationship[]
       }
       sales_records: {

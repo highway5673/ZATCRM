@@ -89,6 +89,17 @@ create table if not exists tracking_records (
 );
 
 -- ============================================================
+-- 跟踪赠品表（属于一次跟踪/拜访）
+-- ============================================================
+create table if not exists tracking_gifts (
+  id uuid primary key default uuid_generate_v4(),
+  tracking_record_id uuid references tracking_records(id) on delete cascade not null,
+  name text not null,
+  quantity integer default 1 not null check (quantity > 0),
+  created_at timestamptz default now() not null
+);
+
+-- ============================================================
 -- 销售记录表
 -- ============================================================
 create table if not exists sales_records (
@@ -187,6 +198,7 @@ alter table visits enable row level security;
 alter table gifts enable row level security;
 alter table follow_ups enable row level security;
 alter table tracking_records enable row level security;
+alter table tracking_gifts enable row level security;
 alter table sales_records enable row level security;
 alter table opportunities enable row level security;
 alter table tasks enable row level security;
@@ -226,6 +238,21 @@ create policy "用户只能访问自己的跟进记录" on follow_ups
 create policy "用户只能访问自己的跟踪记录" on tracking_records
   for all using (auth.uid() = user_id);
 
+-- tracking_gifts（通过 tracking_records 关联）
+create policy "用户只能访问自己跟踪记录的赠品" on tracking_gifts
+  for all using (
+    exists (
+      select 1 from tracking_records where tracking_records.id = tracking_gifts.tracking_record_id
+        and tracking_records.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from tracking_records where tracking_records.id = tracking_gifts.tracking_record_id
+        and tracking_records.user_id = auth.uid()
+    )
+  );
+
 -- sales_records
 create policy "用户只能访问自己的销售记录" on sales_records
   for all using (auth.uid() = user_id);
@@ -245,6 +272,7 @@ create policy "禁止客户端直接访问验证码" on otp_codes
 create index if not exists tracking_records_customer_id_idx on tracking_records(customer_id);
 create index if not exists tracking_records_user_id_idx on tracking_records(user_id);
 create index if not exists tracking_records_tracked_at_idx on tracking_records(tracked_at desc);
+create index if not exists tracking_gifts_tracking_record_id_idx on tracking_gifts(tracking_record_id);
 create index if not exists sales_records_customer_id_idx on sales_records(customer_id);
 create index if not exists sales_records_user_id_idx on sales_records(user_id);
 create index if not exists sales_records_sale_date_idx on sales_records(sale_date desc);

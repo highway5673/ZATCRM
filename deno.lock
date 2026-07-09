@@ -27,6 +27,7 @@
         "npm:expo-asset@~57.0.3",
         "npm:expo-audio@57.0",
         "npm:expo-constants@~57.0.3",
+        "npm:expo-file-system@57.0",
         "npm:expo-linking@~57.0.2",
         "npm:expo-location@~57.0.2",
         "npm:expo-router@~57.0.4",
