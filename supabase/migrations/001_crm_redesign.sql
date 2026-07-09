@@ -1,5 +1,4 @@
 -- Phase 1: CRM 重设计数据库迁移
--- 在 Supabase SQL Editor 中手动执行
 
 -- 1. customers 表新增 customer_type 字段
 alter table customers
@@ -7,13 +6,10 @@ alter table customers
   check (customer_type in ('潜在伙伴', '客户', '伙伴'));
 
 -- 2. 新建跟踪记录表（合并拜访+跟进）
-create type if not exists tracking_method as enum (
-  'visit',
-  'phone',
-  'wechat',
-  'email',
-  'other'
-);
+do $$ begin
+  create type tracking_method as enum ('visit', 'phone', 'wechat', 'email', 'other');
+exception when duplicate_object then null;
+end $$;
 
 create table if not exists tracking_records (
   id            uuid primary key default uuid_generate_v4(),
@@ -28,8 +24,11 @@ create table if not exists tracking_records (
 
 alter table tracking_records enable row level security;
 
-create policy if not exists "用户只能访问自己的跟踪记录" on tracking_records
-  for all using (auth.uid() = user_id);
+do $$ begin
+  create policy "用户只能访问自己的跟踪记录" on tracking_records
+    for all using (auth.uid() = user_id);
+exception when duplicate_object then null;
+end $$;
 
 create index if not exists tracking_records_customer_id_idx on tracking_records(customer_id);
 create index if not exists tracking_records_user_id_idx on tracking_records(user_id);
@@ -51,8 +50,11 @@ create table if not exists sales_records (
 
 alter table sales_records enable row level security;
 
-create policy if not exists "用户只能访问自己的销售记录" on sales_records
-  for all using (auth.uid() = user_id);
+do $$ begin
+  create policy "用户只能访问自己的销售记录" on sales_records
+    for all using (auth.uid() = user_id);
+exception when duplicate_object then null;
+end $$;
 
 create index if not exists sales_records_customer_id_idx on sales_records(customer_id);
 create index if not exists sales_records_user_id_idx on sales_records(user_id);
