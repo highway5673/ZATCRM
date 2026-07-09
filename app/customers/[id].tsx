@@ -369,8 +369,9 @@ function AddSalesModal({
               title="语音新增销售"
               scriptLines={[
                 '产品：净水器滤芯，数量：2，单价：199',
-                '金额：398，备注：客户要求周五送货',
-                '金额可不说，系统会按数量和单价计算',
+                '金额：398',
+                '备注：客户要求周五送货',
+                '提示：金额可以不说，系统会根据数量和单价计算；说错了重新说，可以根据提示说慢了也没关系',
               ]}
               disabled={saving}
               onApply={applyVoiceFields}
@@ -587,9 +588,6 @@ export default function CustomerDetailScreen() {
         </TouchableOpacity>
         <Text className="text-base font-semibold text-gray-800">客户详情</Text>
         <View className="flex-row items-center gap-3">
-          <TouchableOpacity onPress={() => router.push(`/customers/${id}/edit`)}>
-            <Text className="text-[#007AFF] text-sm font-semibold">编辑</Text>
-          </TouchableOpacity>
           <TouchableOpacity onPress={handleDelete}>
             <Text className="text-red-400 text-sm">删除</Text>
           </TouchableOpacity>
@@ -609,6 +607,13 @@ export default function CustomerDetailScreen() {
                 <View className={`${typeStyle.bg} rounded-full px-2.5 py-0.5`}>
                   <Text className={`${typeStyle.text} text-xs font-medium`}>{customer.customer_type}</Text>
                 </View>
+                <TouchableOpacity
+                  className="rounded-full bg-blue-50 px-2.5 py-0.5"
+                  onPress={() => router.push(`/customers/${id}/edit`)}
+                  activeOpacity={0.75}
+                >
+                  <Text className="text-[#007AFF] text-xs font-semibold">编辑</Text>
+                </TouchableOpacity>
               </View>
               {customer.company ? (
                 <Text className="text-gray-500 mt-0.5">{customer.company}</Text>

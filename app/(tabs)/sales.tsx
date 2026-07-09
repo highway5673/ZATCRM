@@ -177,8 +177,9 @@ function AddSalesModal({
               title="语音新增销售"
               scriptLines={[
                 defaultCustomerId ? '产品：净水器滤芯，数量：2，单价：199' : '客户：张三，产品：净水器滤芯，数量：2，单价：199',
-                '金额：398，备注：客户要求周五送货',
-                '金额可不说，系统会按数量和单价计算',
+                '金额：398',
+                '备注：客户要求周五送货',
+                '提示：金额可以不说，系统会根据数量和单价计算；说错了重新说，可以根据提示说慢了也没关系',
               ]}
               disabled={saving}
               onApply={applyVoiceFields}
