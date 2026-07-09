@@ -6,6 +6,23 @@ import { supabase } from './supabase'
 import type { CustomerLocation } from '../types/database'
 
 const DEDUP_METERS = 300
+const GEOCODE_TIMEOUT_MS = 8000
+
+type BigDataCloudAddress = {
+  principalSubdivision?: string
+  city?: string
+  locality?: string
+  postcode?: string
+  localityInfo?: {
+    administrative?: { name?: string }[]
+    informative?: { name?: string }[]
+  }
+}
+
+type NominatimAddress = {
+  display_name?: string
+  address?: Record<string, string | undefined>
+}
 
 function haversineMeters(
   lat1: number, lon1: number,
@@ -37,18 +54,94 @@ export async function getCurrentCoords(): Promise<{ latitude: number; longitude:
   }
 }
 
+async function fetchJsonWithTimeout<T>(url: string, headers?: Record<string, string>): Promise<T> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), GEOCODE_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(url, {
+      headers,
+      signal: controller.signal,
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return await response.json() as T
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+function compactAddressParts(parts: Array<string | null | undefined>) {
+  const seen = new Set<string>()
+  return parts
+    .map(part => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .filter((part) => {
+      if (seen.has(part)) return false
+      seen.add(part)
+      return true
+    })
+    .join('')
+}
+
+async function reverseGeocodeWithBigDataCloud(lat: number, lon: number): Promise<string | null> {
+  const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=zh`
+  const result = await trackPerf('location.reverseGeocode.bigDataCloud', () =>
+    fetchJsonWithTimeout<BigDataCloudAddress>(url))
+
+  const district = result.localityInfo?.administrative?.find(item => item.name?.endsWith('区') || item.name?.endsWith('县'))?.name
+  const street = result.localityInfo?.informative?.find(item => item.name && item.name.length > 1)?.name
+  const address = compactAddressParts([
+    result.principalSubdivision,
+    result.city,
+    district,
+    result.locality,
+    street,
+  ])
+
+  return address || result.locality || result.city || null
+}
+
+async function reverseGeocodeWithNominatim(lat: number, lon: number): Promise<string | null> {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=zh-CN`
+  const result = await trackPerf('location.reverseGeocode.nominatim', () =>
+    fetchJsonWithTimeout<NominatimAddress>(url, {
+      'User-Agent': 'ZATCRM/1.0 reverse-geocode',
+    }))
+
+  const address = result.address
+  if (!address) return result.display_name ?? null
+
+  return compactAddressParts([
+    address.state,
+    address.city || address.town || address.county,
+    address.suburb || address.city_district || address.district,
+    address.road || address.pedestrian,
+    address.house_number,
+  ]) || result.display_name || null
+}
+
 async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
   try {
     const [result] = await trackPerf('location.reverseGeocode', () =>
       ExpoLocation.reverseGeocodeAsync({ latitude: lat, longitude: lon }))
-    if (!result) return null
-    return [result.region, result.city, result.district, result.street, result.streetNumber]
+    const nativeAddress = result ? [result.region, result.city, result.district, result.street, result.streetNumber]
       .filter(Boolean)
       .join('')
       || result.formattedAddress
-      || null
+      || null : null
+    if (nativeAddress) return nativeAddress
   } catch {
-    return null
+    // Fall through to HTTP-based providers below. Android's native geocoder can time out.
+  }
+
+  try {
+    return await reverseGeocodeWithBigDataCloud(lat, lon)
+  } catch {
+    try {
+      return await reverseGeocodeWithNominatim(lat, lon)
+    } catch {
+      return null
+    }
   }
 }
 
