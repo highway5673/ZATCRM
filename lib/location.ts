@@ -38,7 +38,7 @@ async function reverseGeocode(lat: number, lon: number): Promise<string | null> 
   try {
     const [result] = await ExpoLocation.reverseGeocodeAsync({ latitude: lat, longitude: lon })
     if (!result) return null
-    return [result.district, result.street, result.streetNumber]
+    return [result.region, result.city, result.district, result.street, result.streetNumber]
       .filter(Boolean)
       .join('')
       || result.formattedAddress
@@ -102,4 +102,10 @@ export function openNavigation(latitude: number, longitude: number, label?: stri
   Linking.openURL(url).catch(() => {
     Alert.alert('无法打开地图', '请确认手机已安装地图或导航应用')
   })
+}
+
+export function formatLocationLabel(location: Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'>) {
+  const address = location.address?.trim()
+  if (address) return address
+  return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
 }

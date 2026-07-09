@@ -6,7 +6,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { openNavigation, resolveVisitLocation } from '../../lib/location'
+import { formatLocationLabel, openNavigation, resolveVisitLocation } from '../../lib/location'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { CustomerLocation, TrackingMethod } from '../../types/database'
 
@@ -361,6 +361,8 @@ function AddTrackingModal({
 
 function TrackingCard({ item }: { item: TrackingWithCustomer }) {
   const m = METHOD_MAP[item.method]
+  const locationLabel = item.customer_locations ? formatLocationLabel(item.customer_locations) : ''
+
   return (
     <View className="bg-white rounded-lg p-4 mb-3">
       <View className="flex-row items-start justify-between mb-2">
@@ -381,7 +383,7 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
       {item.customer_locations && item.method === 'visit' && (
         <View className="flex-row items-center mt-2">
           <Text className="text-gray-300 text-xs flex-1 mr-2" numberOfLines={1}>
-            📍 {item.customer_locations.address || '拜访位置'}
+            📍 {locationLabel}
           </Text>
           <TouchableOpacity
             className="px-2.5 py-1 rounded-full bg-blue-50"

@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { openNavigation, resolveVisitLocation } from '../../lib/location'
+import { formatLocationLabel, openNavigation, resolveVisitLocation } from '../../lib/location'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type {
   Customer, CustomerLocation, CustomerType, TrackingMethod, SalesRecord,
@@ -652,6 +652,7 @@ export default function CustomerDetailScreen() {
             ) : (
               trackingRecords.map((rec, i) => {
                 const m = METHOD_MAP[rec.method]
+                const locationLabel = rec.customer_locations ? formatLocationLabel(rec.customer_locations) : ''
                 return (
                   <View key={rec.id} className={`px-4 py-3.5 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
                     <View className="flex-row items-center justify-between mb-1.5">
@@ -665,7 +666,7 @@ export default function CustomerDetailScreen() {
                     {rec.customer_locations && rec.method === 'visit' && (
                       <View className="mt-2 flex-row items-center">
                         <Text className="text-gray-300 text-xs flex-1 mr-2" numberOfLines={1}>
-                          📍 {rec.customer_locations.address || '拜访位置'}
+                          📍 {locationLabel}
                         </Text>
                         <TouchableOpacity
                           className="px-2.5 py-1 rounded-full bg-blue-50"
