@@ -406,20 +406,35 @@ function TaskItem({
   const router = useRouter()
   const isDone = task.status === 'done'
   const isPostponed = task.status === 'postponed'
+  const reminderTime = task.remind_at ? new Date(task.remind_at).getTime() : Number.NaN
+  const isOverdue = task.status === 'pending' && !Number.isNaN(reminderTime) && reminderTime < Date.now()
 
   return (
     <TouchableOpacity
-      className={`bg-white rounded-lg px-4 py-3.5 mb-3 flex-row items-start ${
+      className={`rounded-lg px-4 py-3.5 mb-3 flex-row items-start border ${
+        isOverdue ? 'bg-red-50 border-red-200' : 'bg-white border-transparent'
+      } ${
         isDone ? 'opacity-50' : ''
       }`}
       onPress={() => router.push(`/tasks/${task.id}`)}
       activeOpacity={0.7}
     >
       <View className="flex-1">
-        <Text className={`text-base font-medium ${isDone ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+        <Text className={`text-base font-medium ${
+          isOverdue ? 'text-red-700' : isDone ? 'line-through text-gray-400' : 'text-gray-800'
+        }`}>
           {task.title}
         </Text>
-        <Text className="text-[#007AFF] text-xs mt-2">{formatTaskReminder(task.remind_at)}</Text>
+        <View className="flex-row items-center mt-2 gap-2">
+          <Text className={`text-xs ${isOverdue ? 'text-red-600' : 'text-[#007AFF]'}`}>
+            {formatTaskReminder(task.remind_at)}
+          </Text>
+          {isOverdue ? (
+            <View className="bg-red-100 rounded px-1.5 py-0.5">
+              <Text className="text-red-600 text-xs font-semibold">已超时</Text>
+            </View>
+          ) : null}
+        </View>
         <View className="mt-1.5 gap-1">
           <Text className="text-gray-500 text-xs" numberOfLines={1}>客户：{task.customers?.name ?? '未关联'}</Text>
           <Text className="text-gray-400 text-xs" numberOfLines={1}>备注：{task.notes || '无'}</Text>
