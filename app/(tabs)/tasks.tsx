@@ -382,6 +382,22 @@ function AddTaskModal({
 
 type TaskWithCustomer = Task & { customers: { name: string } | null }
 
+function formatTaskReminder(remindAt: string | null) {
+  if (!remindAt) return '提醒：未设置'
+  const date = new Date(remindAt)
+  if (Number.isNaN(date.getTime())) return '提醒：未设置'
+  return `提醒：${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function sortTasksByReminderDistance(tasks: TaskWithCustomer[]) {
+  const now = Date.now()
+  const distance = (task: TaskWithCustomer) => {
+    const remindAt = task.remind_at ? new Date(task.remind_at).getTime() : Number.NaN
+    return Number.isNaN(remindAt) ? Number.POSITIVE_INFINITY : Math.abs(remindAt - now)
+  }
+  return [...tasks].sort((left, right) => distance(left) - distance(right))
+}
+
 function TaskItem({
   task,
 }: {
@@ -393,33 +409,22 @@ function TaskItem({
 
   return (
     <TouchableOpacity
-      className={`bg-white rounded-lg px-4 py-3.5 mb-3 flex-row items-center ${
+      className={`bg-white rounded-lg px-4 py-3.5 mb-3 flex-row items-start ${
         isDone ? 'opacity-50' : ''
       }`}
       onPress={() => router.push(`/tasks/${task.id}`)}
       activeOpacity={0.7}
     >
-      <View className={`w-6 h-6 rounded-full border-2 mr-3 items-center justify-center ${
-        isDone
-          ? 'bg-green-500 border-green-500'
-          : isPostponed
-          ? 'border-amber-400'
-          : 'border-gray-300'
-      }`}>
-        {isDone && <Text className="text-white text-xs">✓</Text>}
-        {isPostponed && <Text className="text-amber-400 text-xs">↷</Text>}
-      </View>
       <View className="flex-1">
-        <Text className={`text-base ${isDone ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+        <Text className={`text-base font-medium ${isDone ? 'line-through text-gray-400' : 'text-gray-800'}`}>
           {task.title}
         </Text>
-        <View className="flex-row items-center gap-2 mt-0.5">
-          {task.customers && (
-            <Text className="text-gray-400 text-xs">👤 {task.customers.name}</Text>
-          )}
-          {task.notes && (
-            <Text className="text-gray-400 text-xs" numberOfLines={1}>· {task.notes}</Text>
-          )}
+        <Text className="text-[#007AFF] text-xs mt-2">{formatTaskReminder(task.remind_at)}</Text>
+        <View className="mt-1.5 gap-1">
+          <Text className="text-gray-500 text-xs" numberOfLines={1}>客户：{task.customers?.name ?? '未关联'}</Text>
+          <Text className="text-gray-400 text-xs" numberOfLines={1}>备注：{task.notes || '无'}</Text>
+        </View>
+        <View className="flex-row mt-2">
           {isPostponed && (
             <View className="bg-amber-50 rounded px-1.5 py-0.5">
               <Text className="text-amber-500 text-xs">已推迟</Text>
@@ -462,9 +467,9 @@ export default function TasksScreen() {
       supabase
         .from('tasks')
         .select('*, customers(name)')
-        .order('created_at', { ascending: false }))
+        .order('remind_at', { ascending: true, nullsFirst: false }))
 
-    if (!error && data) setTasks(data as unknown as TaskWithCustomer[])
+    if (!error && data) setTasks(sortTasksByReminderDistance(data as unknown as TaskWithCustomer[]))
     setLoading(false)
   }, [])
 

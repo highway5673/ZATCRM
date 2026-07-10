@@ -64,6 +64,29 @@ export default function TaskDetailScreen() {
     }
   }
 
+  const deleteTask = async () => {
+    if (!task) return
+    try {
+      setUpdating(true)
+      const { error } = await trackPerf('taskDetail.delete', () =>
+        supabase.from('tasks').delete().eq('id', task.id),
+      { id: task.id })
+      if (error) throw error
+      router.back()
+    } catch (error) {
+      Alert.alert('删除失败', error instanceof Error ? error.message : '请稍后重试')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const confirmDelete = () => {
+    Alert.alert('删除任务', '删除后无法恢复，是否继续？', [
+      { text: '取消', style: 'cancel' },
+      { text: '删除', style: 'destructive', onPress: () => void deleteTask() },
+    ])
+  }
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-[#F2F2F7]">
@@ -164,6 +187,13 @@ export default function TaskDetailScreen() {
               <Text className="text-gray-700 text-base font-semibold">恢复为待办</Text>
             </TouchableOpacity>
           ) : null}
+          <TouchableOpacity
+            className="bg-white border border-red-200 rounded-lg py-3.5 items-center"
+            onPress={confirmDelete}
+            disabled={updating}
+          >
+            <Text className="text-red-500 text-base font-semibold">删除任务</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
