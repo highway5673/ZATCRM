@@ -5,7 +5,7 @@ import {
   ScrollView, TextInput,
 } from 'react-native'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
@@ -408,35 +408,19 @@ type TaskWithCustomer = Task & { customers: { name: string } | null }
 
 function TaskItem({
   task,
-  onStatusChange,
 }: {
   task: TaskWithCustomer
-  onStatusChange: (id: string, status: TaskStatus) => void
 }) {
+  const router = useRouter()
   const isDone = task.status === 'done'
   const isPostponed = task.status === 'postponed'
-
-  const showActions = () => {
-    if (isDone) {
-      Alert.alert('任务操作', task.title, [
-        { text: '标记待办', onPress: () => onStatusChange(task.id, 'pending') },
-        { text: '取消', style: 'cancel' },
-      ])
-      return
-    }
-    Alert.alert('任务操作', task.title, [
-      { text: '✅ 完成', onPress: () => onStatusChange(task.id, 'done') },
-      { text: '⏰ 推迟', onPress: () => onStatusChange(task.id, 'postponed') },
-      { text: '取消', style: 'cancel' },
-    ])
-  }
 
   return (
     <TouchableOpacity
       className={`bg-white rounded-lg px-4 py-3.5 mb-3 flex-row items-center ${
         isDone ? 'opacity-50' : ''
       }`}
-      onPress={showActions}
+      onPress={() => router.push(`/tasks/${task.id}`)}
       activeOpacity={0.7}
     >
       <View className={`w-6 h-6 rounded-full border-2 mr-3 items-center justify-center ${
@@ -508,9 +492,9 @@ export default function TasksScreen() {
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
+  useFocusEffect(useCallback(() => {
+    void fetchTasks()
+  }, [fetchTasks]))
 
   useEffect(() => {
     if (params.createTask !== '1') return
@@ -520,13 +504,6 @@ export default function TasksScreen() {
     handledCreateKeyRef.current = createKey
     setShowAdd(true)
   }, [params.createTask, params.customerId, params.customerName])
-
-  const handleStatusChange = async (id: string, status: TaskStatus) => {
-    await trackPerf('tasks.updateStatus', () =>
-      supabase.from('tasks').update({ status }).eq('id', id),
-    { status })
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t))
-  }
 
   const closeAddTask = () => {
     setShowAdd(false)
@@ -585,7 +562,7 @@ export default function TasksScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
           renderItem={({ item }) => (
-            <TaskItem task={item} onStatusChange={handleStatusChange} />
+            <TaskItem task={item} />
           )}
           ListEmptyComponent={
             <View className="items-center justify-center mt-20">
