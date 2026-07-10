@@ -54,7 +54,7 @@ const FORM_SCHEMAS = {
       customer_name: { type: ['string', 'null'] },
       title: { type: ['string', 'null'] },
       notes: { type: ['string', 'null'] },
-      reminder: { type: ['string', 'null'], enum: ['today', 'tomorrow', 'none', null] },
+      remind_at: { type: ['string', 'null'] },
     },
   },
 } as const
@@ -145,8 +145,9 @@ async function parseTranscript(transcript: string, formType: FormType) {
     '销售表单中 unit 是销售单位，例如盒、箱、个、瓶、套；听不到则填 null。',
     '任务表单中 title 是要完成的任务内容，只保留动作和事项，不要把提醒规则、备注标签混进 title。',
     '任务表单中 customer_name 只填写关联客户名称；notes 填写执行细节、要求、材料、注意事项。',
+    `当前中国时间：${getShanghaiDateTime()}（Asia/Shanghai，UTC+08:00）。`,
+    '任务表单中 remind_at 是提醒时间。将“三天后下午3点”“下周一上午9点”等相对时间换算为完整 ISO 8601 时间，必须带 +08:00，例如 2026-07-13T15:00:00+08:00；没有说提醒时间则填 null。',
     'customer_type 只允许：潜在伙伴、客户、伙伴。',
-    'reminder 只允许：today、tomorrow、none。',
     `表单类型：${formType}`,
     `语音文本：${transcript}`,
   ].join('\n')
@@ -223,6 +224,20 @@ function normalizeFields(fields: Record<string, unknown>, formType: FormType) {
   }
 
   return normalized
+}
+
+function getShanghaiDateTime() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date())
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`
 }
 
 function extractJson(content: string) {

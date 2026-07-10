@@ -12,20 +12,19 @@ import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type { Task, TaskStatus } from '../../types/database'
 
 type CustomerOption = { id: string; name: string; company: string | null }
-type ReminderChoice = 'today' | 'tomorrow' | 'none'
 
 type TaskVoiceFields = {
   customer_name?: string | null
   title?: string | null
   notes?: string | null
-  reminder?: ReminderChoice | null
+  remind_at?: string | null
 }
 
-function getVoiceReminderAt(choice: ReminderChoice) {
+function getDefaultReminderAt() {
   const date = new Date()
-  if (choice === 'tomorrow') date.setDate(date.getDate() + 1)
+  date.setDate(date.getDate() + 2)
   date.setHours(9, 0, 0, 0)
-  return date.toISOString()
+  return date
 }
 
 function formatDateLabel(date: Date) {
@@ -52,12 +51,7 @@ function AddTaskModal({
   const [customerId, setCustomerId] = useState('')
   const [customerSearch, setCustomerSearch] = useState('')
   const [customers, setCustomers] = useState<CustomerOption[]>([])
-  const [reminderEnabled, setReminderEnabled] = useState(true)
-  const [reminderAt, setReminderAt] = useState(() => {
-    const date = new Date()
-    date.setHours(9, 0, 0, 0)
-    return date
-  })
+  const [reminderAt, setReminderAt] = useState(getDefaultReminderAt)
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -104,15 +98,12 @@ function AddTaskModal({
   }, [visible, customerSearch, customerId, defaultCustomer, searchCustomers])
 
   const reset = () => {
-    const date = new Date()
-    date.setHours(9, 0, 0, 0)
     setTitle('')
     setNotes('')
     setCustomerId(defaultCustomer?.id ?? '')
     setCustomerSearch(defaultCustomer?.name ?? '')
     setCustomers(defaultCustomer ? [defaultCustomer] : [])
-    setReminderEnabled(true)
-    setReminderAt(date)
+    setReminderAt(getDefaultReminderAt())
     setPickerMode(null)
   }
   const handleClose = () => { reset(); onClose() }
@@ -143,9 +134,9 @@ function AddTaskModal({
   const applyVoiceFields = (fields: TaskVoiceFields) => {
     if (fields.title) setTitle(fields.title)
     if (fields.notes) setNotes(fields.notes)
-    if (fields.reminder) {
-      setReminderEnabled(fields.reminder !== 'none')
-      if (fields.reminder !== 'none') setReminderAt(new Date(getVoiceReminderAt(fields.reminder)))
+    if (fields.remind_at) {
+      const parsedReminderAt = new Date(fields.remind_at)
+      if (!Number.isNaN(parsedReminderAt.getTime())) setReminderAt(parsedReminderAt)
     }
     if (fields.customer_name) {
       const matchedId = findCustomerId(fields.customer_name)
@@ -159,11 +150,13 @@ function AddTaskModal({
     const nextTitle = (fields?.title ?? title).trim()
     const nextNotes = (fields?.notes ?? notes).trim()
     const nextCustomerId = customerId || findCustomerId(fields?.customer_name) || await findCustomerIdFromDatabase(fields?.customer_name)
-    const nextReminderAt = fields?.reminder
-      ? fields.reminder === 'none' ? null : getVoiceReminderAt(fields.reminder)
-      : reminderEnabled ? reminderAt.toISOString() : null
+    const parsedVoiceReminderAt = fields?.remind_at ? new Date(fields.remind_at) : null
+    const nextReminderAt = parsedVoiceReminderAt && !Number.isNaN(parsedVoiceReminderAt.getTime())
+      ? parsedVoiceReminderAt.toISOString()
+      : reminderAt.toISOString()
 
     if (!nextTitle) throw new Error('请输入任务标题')
+    if (Number.isNaN(new Date(nextReminderAt).getTime())) throw new Error('请设置有效的提醒时间')
     try {
       setSaving(true)
       const { data: { user } } = await trackPerf('tasks.add.getUser', () => supabase.auth.getUser())
@@ -243,9 +236,9 @@ function AddTaskModal({
               scriptLines={[
                 '任务内容：给客户发送报价单，确认产品型号和价格',
                 '关联客户：张三',
-                '提醒：今天 / 明天 / 无提醒',
+                '提醒时间：三天后下午 3 点',
                 '备注：附上产品参数、优惠方案和报价有效期',
-                '提示：先说要完成的任务内容，再补充客户、提醒和执行细节；不需要提醒可以说无提醒',
+                '提示：提醒时间必填，可说三天后下午 3 点、下周一上午 9 点等具体时间',
               ]}
               disabled={saving}
               submitMode="fill"
@@ -338,50 +331,33 @@ function AddTaskModal({
           </View>
 
           <View className="mx-4 mt-4 bg-white rounded-lg p-4">
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-xs text-gray-400 uppercase font-semibold">提醒时间</Text>
+            <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">提醒时间 *</Text>
+            <View className="flex-row gap-3">
               <TouchableOpacity
-                className={`rounded-full px-3 py-1.5 ${reminderEnabled ? 'bg-blue-50' : 'bg-gray-100'}`}
-                onPress={() => setReminderEnabled(prev => !prev)}
+                className="flex-1 border border-gray-100 rounded-lg px-3 py-3"
+                onPress={() => setPickerMode('date')}
                 activeOpacity={0.75}
               >
-                <Text className={`text-xs font-semibold ${reminderEnabled ? 'text-[#007AFF]' : 'text-gray-400'}`}>
-                  {reminderEnabled ? '已开启' : '不提醒'}
-                </Text>
+                <Text className="text-gray-400 text-xs mb-1">日期</Text>
+                <Text className="text-gray-900 text-base font-medium">{formatDateLabel(reminderAt)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 border border-gray-100 rounded-lg px-3 py-3"
+                onPress={() => setPickerMode('time')}
+                activeOpacity={0.75}
+              >
+                <Text className="text-gray-400 text-xs mb-1">时间</Text>
+                <Text className="text-gray-900 text-base font-medium">{formatTimeLabel(reminderAt)}</Text>
               </TouchableOpacity>
             </View>
-            {reminderEnabled ? (
-              <>
-                <View className="flex-row gap-3">
-                  <TouchableOpacity
-                    className="flex-1 border border-gray-100 rounded-lg px-3 py-3"
-                    onPress={() => setPickerMode('date')}
-                    activeOpacity={0.75}
-                  >
-                    <Text className="text-gray-400 text-xs mb-1">日期</Text>
-                    <Text className="text-gray-900 text-base font-medium">{formatDateLabel(reminderAt)}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    className="flex-1 border border-gray-100 rounded-lg px-3 py-3"
-                    onPress={() => setPickerMode('time')}
-                    activeOpacity={0.75}
-                  >
-                    <Text className="text-gray-400 text-xs mb-1">时间</Text>
-                    <Text className="text-gray-900 text-base font-medium">{formatTimeLabel(reminderAt)}</Text>
-                  </TouchableOpacity>
-                </View>
-                {pickerMode ? (
-                  <DateTimePicker
-                    value={reminderAt}
-                    mode={pickerMode}
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={handlePickerChange}
-                  />
-                ) : null}
-              </>
-            ) : (
-              <Text className="text-gray-400 text-sm">该任务不会设置提醒时间</Text>
-            )}
+            {pickerMode ? (
+              <DateTimePicker
+                value={reminderAt}
+                mode={pickerMode}
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handlePickerChange}
+              />
+            ) : null}
           </View>
 
           <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
