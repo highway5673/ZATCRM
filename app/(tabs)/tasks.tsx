@@ -248,6 +248,7 @@ function AddTaskModal({
                 '提示：先说要完成的任务内容，再补充客户、提醒和执行细节；不需要提醒可以说无提醒',
               ]}
               disabled={saving}
+              submitMode="fill"
               onApply={applyVoiceFields}
               onSubmit={saveTask}
             />
