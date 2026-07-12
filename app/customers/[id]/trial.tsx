@@ -81,7 +81,7 @@ export default function AddTrialScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-[#F2F2F7]"
+      className="flex-1 bg-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View className="bg-white px-5 pt-14 pb-4 flex-row items-center justify-between border-b border-gray-100">

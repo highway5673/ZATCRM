@@ -122,15 +122,18 @@ export default function LoginScreen() {
   if (step === 'phone') {
     return (
       <KeyboardAvoidingView
-        className="flex-1 bg-[#F2F2F7]"
+        className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-1 justify-center px-8">
-          <Text className="text-3xl font-bold text-gray-900 mb-1">销售CRM</Text>
-          <Text className="text-gray-500 mb-10">输入手机号登录或注册</Text>
+        <View className="flex-1 justify-center px-6">
+          <View className="w-14 h-14 rounded-2xl bg-brand-600 items-center justify-center mb-6">
+            <Text className="text-accent-100 text-xl font-bold">CRM</Text>
+          </View>
+          <Text className="text-3xl font-bold text-gray-900 mb-2">销售工作台</Text>
+          <Text className="text-gray-500 text-base mb-10">客户、跟踪、销售与任务，一处高效管理</Text>
 
-          <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">手机号</Text>
-          <View className="bg-white rounded-lg px-4 py-3.5 mb-6 flex-row items-center">
+          <Text className="text-sm font-semibold text-gray-600 mb-2">手机号</Text>
+          <View className="bg-white rounded-2xl px-4 py-3.5 mb-5 flex-row items-center border border-line shadow-card">
             <Text className="text-gray-400 mr-2">+86</Text>
             <TextInput
               className="flex-1 text-base text-gray-900"
@@ -145,7 +148,7 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            className="bg-primary-600 rounded-lg py-3.5 items-center"
+            className="bg-brand-600 rounded-2xl min-h-12 py-3.5 items-center justify-center"
             onPress={handleSendOtp}
             disabled={loading}
             activeOpacity={0.85}
@@ -166,23 +169,23 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-[#F2F2F7]"
+      className="flex-1 bg-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View className="flex-1 justify-center px-8">
+      <View className="flex-1 justify-center px-6">
         <TouchableOpacity onPress={() => { setStep('phone'); setOtp(['', '', '', '', '', '']) }} className="mb-8">
           <Text className="text-primary-600 text-base">‹ 修改手机号</Text>
         </TouchableOpacity>
 
-        <Text className="text-2xl font-bold text-gray-900 mb-1">输入验证码</Text>
-        <Text className="text-gray-500 mb-8">已发送至 +86 {normalizedPhone}</Text>
+        <Text className="text-2xl font-bold text-gray-900 mb-2">输入验证码</Text>
+        <Text className="text-gray-500 text-base mb-8">已发送至 +86 {normalizedPhone}</Text>
 
         <View className="flex-row justify-between mb-8">
           {otp.map((digit, i) => (
             <TextInput
               key={i}
               ref={ref => { otpRefs.current[i] = ref }}
-              className={`w-12 h-14 bg-white rounded-lg text-center text-xl font-bold text-gray-900 border-2 ${
+              className={`w-12 h-14 bg-white rounded-xl text-center text-xl font-bold text-gray-900 border-2 ${
                 digit ? 'border-primary-600' : 'border-transparent'
               }`}
               keyboardType="number-pad"

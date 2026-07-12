@@ -6,9 +6,10 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { formatLocationLabel, openNavigation, resolveVisitLocation } from '../../lib/location'
+import { attachVisitLocationToTrackingRecord, formatLocationLabel, openNavigation } from '../../lib/location'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
+import { AppSymbol } from '../../components/AppSymbol'
 import type { CustomerLocation, TrackingMethod } from '../../types/database'
 
 const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: boolean }[] = [
@@ -29,12 +30,14 @@ type TrackingVoiceFields = {
   content?: string | null
   gift_name?: string | null
   gift_quantity?: number | null
+  gift_unit?: string | null
 }
 
 type TrackingGift = {
   id: string
   name: string
   quantity: number
+  unit: string | null
 }
 
 type LocationSummary = Pick<CustomerLocation, 'address' | 'latitude' | 'longitude'>
@@ -78,9 +81,9 @@ function AddTrackingModal({
   const [customerSearch, setCustomerSearch] = useState('')
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [giftName, setGiftName] = useState('')
-  const [giftQuantity, setGiftQuantity] = useState('0')
+  const [giftQuantity, setGiftQuantity] = useState('1')
+  const [giftUnit, setGiftUnit] = useState('')
   const [saving, setSaving] = useState(false)
-  const [gpsStatus, setGpsStatus] = useState<string | null>(null)
 
   useEffect(() => {
     if (visible) {
@@ -98,8 +101,8 @@ function AddTrackingModal({
     setCustomerId(defaultCustomerId ?? '')
     setCustomerSearch('')
     setGiftName('')
-    setGiftQuantity('0')
-    setGpsStatus(null)
+    setGiftQuantity('1')
+    setGiftUnit('')
   }
 
   const handleClose = () => { reset(); onClose() }
@@ -134,6 +137,7 @@ function AddTrackingModal({
     if (fields.content) setContent(fields.content)
     if (fields.gift_name) setGiftName(fields.gift_name)
     if (fields.gift_quantity != null) setGiftQuantity(String(fields.gift_quantity))
+    if (fields.gift_unit) setGiftUnit(fields.gift_unit)
     if (!defaultCustomerId && fields.customer_name) {
       setCustomerSearch(fields.customer_name)
       setCustomerId('')
@@ -147,6 +151,7 @@ function AddTrackingModal({
     const nextMethod = fields?.method ?? method
     const nextGiftName = (fields?.gift_name ?? giftName).trim()
     const nextGiftQuantity = Math.max(1, fields?.gift_quantity ?? (parseInt(giftQuantity, 10) || 0))
+    const nextGiftUnit = (fields?.gift_unit ?? giftUnit).trim()
 
     if (!nextCustomerId) throw new Error('请选择关联客户')
     if (!nextContent) throw new Error('请输入跟踪内容')
@@ -156,41 +161,32 @@ function AddTrackingModal({
       const { data: { user } } = await trackPerf('tracking.add.getUser', () => supabase.auth.getUser())
       if (!user) { setSaving(false); throw new Error('登录已失效') }
 
-      let locationId: string | null = null
-
-      if (nextMethod === 'visit') {
-        setGpsStatus('获取位置中...')
-        const loc = await trackPerf('tracking.add.resolveLocation', () =>
-          resolveVisitLocation(nextCustomerId),
-        { customerId: nextCustomerId })
-        if (loc) {
-          locationId = loc.locationId
-          setGpsStatus(loc.address ? `📍 ${loc.address}` : '📍 已记录位置')
-        } else {
-          setGpsStatus('⚠️ 无法获取位置，已跳过')
-        }
-      }
-
       const { data: inserted, error } = await trackPerf('tracking.add.insertRecord', () =>
         supabase.from('tracking_records').insert({
           user_id: user.id,
           customer_id: nextCustomerId,
           method: nextMethod,
           content: nextContent,
-          location_id: locationId,
+          location_id: null,
           tracked_at: new Date().toISOString(),
         }).select('id').single(),
-      { method: nextMethod, hasLocation: Boolean(locationId) })
+      { method: nextMethod, locationQueued: nextMethod === 'visit' })
 
       if (error) throw error
+      if (nextMethod === 'visit' && inserted) {
+        void attachVisitLocationToTrackingRecord(nextCustomerId, inserted.id)
+          .then((location) => { if (location) onSaved() })
+          .catch(() => undefined)
+      }
       if (nextGiftName && inserted) {
         const { error: giftError } = await trackPerf('tracking.add.insertGift', () =>
           supabase.from('tracking_gifts').insert({
             tracking_record_id: inserted.id,
             name: nextGiftName,
             quantity: nextGiftQuantity,
+            unit: nextGiftUnit || null,
           }),
-        { quantity: nextGiftQuantity })
+        { quantity: nextGiftQuantity, unit: nextGiftUnit || null })
         if (giftError) throw giftError
       }
 
@@ -215,7 +211,7 @@ function AddTrackingModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
-        className="flex-1 bg-[#F2F2F7]"
+        className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
@@ -239,7 +235,7 @@ function AddTrackingModal({
               scriptLines={[
                 defaultCustomerId ? '跟踪方式：电话 / 微信 / 邮件 / 上门拜访' : '客户：张三，跟踪方式：电话 / 微信 / 上门拜访',
                 '跟踪内容：今天沟通了产品方案，对方下周确认预算',
-                '赠品：试用装，数量：2',
+                '赠品：试用装，数量：2，单位：盒',
               ]}
               disabled={saving}
               submitMode="fill"
@@ -273,7 +269,7 @@ function AddTrackingModal({
             </ScrollView>
             {METHOD_MAP[method]?.hasGps && (
               <Text className="text-xs text-gray-400 mt-3">
-                {gpsStatus ?? '保存时将自动记录GPS位置'}
+                保存后将自动补充GPS位置
               </Text>
             )}
           </View>
@@ -349,14 +345,30 @@ function AddTrackingModal({
               value={giftName}
               onChangeText={setGiftName}
             />
-            <TextInput
-              className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5"
-              placeholder="数量"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="number-pad"
-              value={giftQuantity}
-              onChangeText={setGiftQuantity}
-            />
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-gray-600 mb-2">数量</Text>
+                <TextInput
+                  className="text-base text-gray-900 border border-gray-200 rounded-lg px-3 py-2.5"
+                  placeholder="1"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="number-pad"
+                  value={giftQuantity}
+                  onChangeText={setGiftQuantity}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-gray-600 mb-2">单位</Text>
+                <TextInput
+                  className="text-base text-gray-900 border border-gray-200 rounded-lg px-3 py-2.5"
+                  placeholder="盒、瓶、套"
+                  placeholderTextColor="#9CA3AF"
+                  value={giftUnit}
+                  onChangeText={setGiftUnit}
+                  maxLength={12}
+                />
+              </View>
+            </View>
           </View>
 
           {/* 跟踪内容 */}
@@ -389,7 +401,7 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
     || (visitLocation ? formatLocationLabel(visitLocation) : '')
 
   return (
-    <View className="bg-white rounded-lg p-4 mb-3">
+    <View className="bg-white rounded-2xl p-4 mb-3 border border-line shadow-card">
       <View className="flex-row items-start justify-between mb-2">
         <View className="flex-row items-center gap-2 flex-1">
           <Text className="text-lg">{m?.emoji ?? '📝'}</Text>
@@ -426,7 +438,7 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
       {item.tracking_gifts?.length ? (
         <View className="mt-2 rounded-lg bg-amber-50 px-3 py-2">
           <Text className="text-amber-700 text-xs">
-            赠品：{item.tracking_gifts.map(gift => `${gift.name} x${gift.quantity}`).join('，')}
+            赠品：{item.tracking_gifts.map(gift => `${gift.name} x${gift.quantity}${gift.unit ?? ''}`).join('，')}
           </Text>
         </View>
       ) : null}
@@ -469,15 +481,15 @@ export default function TrackingScreen() {
   ]
 
   return (
-    <View className="flex-1 bg-[#F2F2F7]">
-      <View className="bg-white px-5 pt-14 pb-4">
+    <View className="flex-1 bg-canvas">
+      <View className="bg-brand-600 px-5 pt-14 pb-5">
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-3xl font-bold text-gray-900">跟踪</Text>
+          <Text className="text-[30px] font-bold text-white">跟踪</Text>
           <TouchableOpacity
-            className="bg-[#007AFF] w-9 h-9 rounded-full items-center justify-center"
+            className="bg-accent-500 w-11 h-11 rounded-full items-center justify-center"
             onPress={() => setShowAdd(true)}
           >
-            <Text className="text-white text-2xl leading-none mt-[-1]">+</Text>
+            <AppSymbol name="add" size={23} color="white" />
           </TouchableOpacity>
         </View>
 
@@ -514,7 +526,9 @@ export default function TrackingScreen() {
           renderItem={({ item }) => <TrackingCard item={item} />}
           ListEmptyComponent={
             <View className="items-center justify-center mt-20">
-              <Text className="text-5xl mb-4">📋</Text>
+              <View className="w-16 h-16 rounded-3xl bg-green-50 items-center justify-center mb-4">
+                <AppSymbol name="tracking" size={30} color="#34A853" />
+              </View>
               <Text className="text-gray-400 text-base">暂无跟踪记录，点击 + 添加</Text>
             </View>
           }

@@ -34,6 +34,7 @@ const FORM_SCHEMAS = {
       content: { type: ['string', 'null'] },
       gift_name: { type: ['string', 'null'] },
       gift_quantity: { type: ['number', 'null'] },
+      gift_unit: { type: ['string', 'null'] },
     },
   },
   sales: {
@@ -62,6 +63,8 @@ const FORM_SCHEMAS = {
 type FormType = keyof typeof FORM_SCHEMAS
 
 serve(async (req) => {
+  const startedAt = Date.now()
+
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
   if (req.method !== 'POST') return fail('请求方法不支持', 405)
   if (!VOLCENGINE_ASR_KEY) return fail('服务未配置 VOLCENGINE_ASR_KEY', 500)
@@ -82,13 +85,18 @@ serve(async (req) => {
   } catch (error) {
     console.error('parse-voice-form error:', error)
     return fail(error instanceof Error ? error.message : '语音处理失败', 500)
+  } finally {
+    perfLog('voice.request.total', startedAt)
   }
 })
 
 async function transcribe(audio: File): Promise<string> {
   const requestId = crypto.randomUUID()
   const format = inferAudioFormat(audio)
-  const audioBase64 = base64Encode(new Uint8Array(await audio.arrayBuffer()))
+  const encodeStartedAt = Date.now()
+  const audioBytes = new Uint8Array(await audio.arrayBuffer())
+  const audioBase64 = base64Encode(audioBytes)
+  perfLog('voice.asr.encodeAudio', encodeStartedAt, { bytes: audioBytes.byteLength, format })
   const headers = {
     'Content-Type': 'application/json',
     'X-Api-Key': VOLCENGINE_ASR_KEY!,
@@ -97,24 +105,30 @@ async function transcribe(audio: File): Promise<string> {
     'X-Api-Sequence': '-1',
   }
 
-  const submitRes = await fetch(VOLCENGINE_SUBMIT_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      user: { uid: 'crm-voice-form' },
-      audio: {
-        data: audioBase64,
-        format,
-        language: 'zh-CN',
-      },
-      request: {
-        model_name: 'bigmodel',
-        enable_itn: true,
-        enable_punc: true,
-        show_utterances: true,
-      },
-    }),
-  })
+  const submitStartedAt = Date.now()
+  let submitRes: Response
+  try {
+    submitRes = await fetch(VOLCENGINE_SUBMIT_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user: { uid: 'crm-voice-form' },
+        audio: {
+          data: audioBase64,
+          format,
+          language: 'zh-CN',
+        },
+        request: {
+          model_name: 'bigmodel',
+          enable_itn: true,
+          enable_punc: true,
+          show_utterances: true,
+        },
+      }),
+    })
+  } finally {
+    perfLog('voice.asr.submit', submitStartedAt, { format })
+  }
 
   const submitCode = submitRes.headers.get('X-Api-Status-Code')
   if (submitCode !== '20000000') {
@@ -141,7 +155,7 @@ async function parseTranscript(transcript: string, formType: FormType) {
     `请从中文口语内容中提取字段，只返回这些字段的 JSON：${Object.keys(FORM_SCHEMAS[formType].properties).join('、')}。`,
     '没有听到的字段填 null，不要编造。',
     'method 映射：上门拜访/拜访=visit，电话=phone，微信=wechat，邮件=email，其他=other。',
-    'gift_name 是本次提供的赠品或试用装名称，gift_quantity 是对应数量。',
+    'gift_name 是本次提供的赠品或试用装名称，gift_quantity 是对应数量，gift_unit 是单位（如盒、瓶、套）。',
     '销售表单中 unit 是销售单位，例如盒、箱、个、瓶、套；听不到则填 null。',
     '任务表单中 title 是要完成的任务内容，只保留动作和事项，不要把提醒规则、备注标签混进 title。',
     '任务表单中 customer_name 只填写关联客户名称；notes 填写执行细节、要求、材料、注意事项。',
@@ -152,22 +166,28 @@ async function parseTranscript(transcript: string, formType: FormType) {
     `语音文本：${transcript}`,
   ].join('\n')
 
-  const res = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages: [
-        { role: 'system', content: '你只输出 JSON，不输出解释。' },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0,
-    }),
-  })
+  const parseStartedAt = Date.now()
+  let res: Response
+  try {
+    res = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages: [
+          { role: 'system', content: '你只输出 JSON，不输出解释。' },
+          { role: 'user', content: prompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+      }),
+    })
+  } finally {
+    perfLog('voice.fieldParse', parseStartedAt, { formType, transcriptLength: transcript.length })
+  }
 
   const body = await res.json().catch(() => null)
   if (!res.ok) throw new Error(formatDeepSeekError(res.status, body, '字段解析失败'))
@@ -184,34 +204,40 @@ function isFormType(value: FormDataEntryValue | null): value is FormType {
 async function pollVolcengineResult(requestId: string) {
   const startedAt = Date.now()
   let delayMs = 1800
+  let attempts = 0
 
-  while (Date.now() - startedAt < 60_000) {
-    await sleep(delayMs)
+  try {
+    while (Date.now() - startedAt < 60_000) {
+      await sleep(delayMs)
+      attempts += 1
 
-    const res = await fetch(VOLCENGINE_QUERY_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': VOLCENGINE_ASR_KEY!,
-        'X-Api-Resource-Id': VOLCENGINE_ASR_RESOURCE_ID,
-        'X-Api-Request-Id': requestId,
-        'X-Api-Sequence': '-1',
-      },
-      body: '{}',
-    })
-    const code = res.headers.get('X-Api-Status-Code')
-    const message = res.headers.get('X-Api-Message')
-    const body = await res.json().catch(() => null)
+      const res = await fetch(VOLCENGINE_QUERY_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': VOLCENGINE_ASR_KEY!,
+          'X-Api-Resource-Id': VOLCENGINE_ASR_RESOURCE_ID,
+          'X-Api-Request-Id': requestId,
+          'X-Api-Sequence': '-1',
+        },
+        body: '{}',
+      })
+      const code = res.headers.get('X-Api-Status-Code')
+      const message = res.headers.get('X-Api-Message')
+      const body = await res.json().catch(() => null)
 
-    if (code === '20000000' || body?.header?.code === 20000000) return body
-    if (code !== '20000001' && code !== '20000002' && body?.header?.code !== 20000001 && body?.header?.code !== 20000002) {
-      throw new Error(formatVolcengineError(code, message, '语音识别失败'))
+      if (code === '20000000' || body?.header?.code === 20000000) return body
+      if (code !== '20000001' && code !== '20000002' && body?.header?.code !== 20000001 && body?.header?.code !== 20000002) {
+        throw new Error(formatVolcengineError(code, message, '语音识别失败'))
+      }
+
+      delayMs = Math.min(delayMs + 700, 5000)
     }
 
-    delayMs = Math.min(delayMs + 700, 5000)
+    throw new Error('语音识别超时，请缩短录音后重试')
+  } finally {
+    perfLog('voice.asr.poll', startedAt, { attempts })
   }
-
-  throw new Error('语音识别超时，请缩短录音后重试')
 }
 
 function normalizeFields(fields: Record<string, unknown>, formType: FormType) {
@@ -271,6 +297,12 @@ function base64Encode(bytes: Uint8Array) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function perfLog(label: string, startedAt: number, details?: Record<string, unknown>) {
+  const durationMs = Date.now() - startedAt
+  const detailText = details ? ` ${JSON.stringify(details)}` : ''
+  console.info(`[CRM PERF] ${label} ${durationMs}ms${detailText}`)
 }
 
 function formatVolcengineError(code: string | null, message: string | null, fallback: string) {

@@ -7,6 +7,7 @@ import type { CustomerLocation } from '../types/database'
 
 const DEDUP_METERS = 300
 const GEOCODE_TIMEOUT_MS = 8000
+const LOCATION_FIX_TIMEOUT_MS = 5000
 
 type BigDataCloudAddress = {
   principalSubdivision?: string
@@ -44,11 +45,56 @@ export async function requestLocationPermission(): Promise<boolean> {
   return status === 'granted'
 }
 
-export async function getCurrentCoords(): Promise<{ latitude: number; longitude: number } | null> {
+type CurrentCoords = {
+  latitude: number
+  longitude: number
+  source: 'lastKnown' | 'current'
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs)
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutId)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timeoutId)
+        reject(error)
+      },
+    )
+  })
+}
+
+export async function getCurrentCoords(): Promise<CurrentCoords | null> {
+  let lastKnown: ExpoLocation.LocationObject | null = null
+  try {
+    lastKnown = await trackPerf('location.lastKnownPosition', () =>
+      ExpoLocation.getLastKnownPositionAsync({
+        maxAge: 60_000,
+        requiredAccuracy: 100,
+      }))
+  } catch {
+    // A cached-position lookup must not prevent a fresh location attempt.
+  }
+
+  if (lastKnown) {
+    return {
+      latitude: lastKnown.coords.latitude,
+      longitude: lastKnown.coords.longitude,
+      source: 'lastKnown',
+    }
+  }
+
   try {
     const loc = await trackPerf('location.currentPosition', () =>
-      ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High }))
-    return { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
+      withTimeout(
+        ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High }),
+        LOCATION_FIX_TIMEOUT_MS,
+        '定位超时',
+      ))
+    return { latitude: loc.coords.latitude, longitude: loc.coords.longitude, source: 'current' }
   } catch {
     return null
   }
@@ -155,6 +201,7 @@ export type LocationResult =
 
 export async function resolveVisitLocation(customerId: string): Promise<LocationResult> {
   const startedAt = perfNow()
+  let coordinateSource: CurrentCoords['source'] | null = null
 
   try {
     const granted = await requestLocationPermission()
@@ -162,6 +209,7 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
 
     const coords = await getCurrentCoords()
     if (!coords) return null
+    coordinateSource = coords.source
 
     const { data: existing } = await trackPerf('location.lookupExisting', () =>
       supabase
@@ -197,7 +245,31 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
     if (error || !inserted) return null
     return { locationId: inserted.id, address, isNew: true }
   } finally {
-    perfLog('location.resolveVisitLocation', startedAt, { customerId })
+    perfLog('location.resolveVisitLocation', startedAt, { customerId, coordinateSource })
+  }
+}
+
+export async function attachVisitLocationToTrackingRecord(
+  customerId: string,
+  trackingRecordId: string,
+): Promise<LocationResult> {
+  const startedAt = perfNow()
+
+  try {
+    const location = await resolveVisitLocation(customerId)
+    if (!location) return null
+
+    const { error } = await trackPerf('location.attachTrackingRecord', () =>
+      supabase
+        .from('tracking_records')
+        .update({ location_id: location.locationId })
+        .eq('id', trackingRecordId),
+    { customerId, trackingRecordId, isNewLocation: location.isNew })
+
+    if (error) throw error
+    return location
+  } finally {
+    perfLog('location.attachVisitToTrackingRecord', startedAt, { customerId, trackingRecordId })
   }
 }
 

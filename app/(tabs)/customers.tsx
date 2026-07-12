@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
+import { AppSymbol } from '../../components/AppSymbol'
 import type { Customer, CustomerType } from '../../types/database'
 
 const CUSTOMER_TYPES: CustomerType[] = ['潜在伙伴', '客户', '伙伴']
@@ -115,7 +116,7 @@ function AddCustomerModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
-        className="flex-1 bg-[#F2F2F7]"
+        className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
@@ -248,7 +249,7 @@ function CustomerCard({ customer, onPress }: { customer: Customer; onPress: () =
 
   return (
     <TouchableOpacity
-      className="bg-white rounded-lg px-4 py-3.5 mb-3 flex-row items-center"
+      className="bg-white rounded-2xl px-4 py-4 mb-3 flex-row items-center border border-line shadow-card"
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -269,7 +270,7 @@ function CustomerCard({ customer, onPress }: { customer: Customer; onPress: () =
           <Text className="text-gray-400 text-xs mt-0.5">{customer.phone}</Text>
         ) : null}
       </View>
-      <Text className="text-gray-300 text-xl">›</Text>
+      <AppSymbol name="chevron" size={18} color="#C7C7CC" />
     </TouchableOpacity>
   )
 }
@@ -306,19 +307,19 @@ export default function CustomersScreen() {
     : customers
 
   return (
-    <View className="flex-1 bg-[#F2F2F7]">
-      <View className="bg-white px-5 pt-14 pb-4">
+    <View className="flex-1 bg-canvas">
+      <View className="bg-brand-600 px-5 pt-14 pb-5">
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-3xl font-bold text-gray-900">客户</Text>
+          <Text className="text-[30px] font-bold text-white">客户</Text>
           <TouchableOpacity
-            className="bg-[#007AFF] w-9 h-9 rounded-full items-center justify-center"
+            className="bg-accent-500 w-11 h-11 rounded-full items-center justify-center"
             onPress={() => setShowAdd(true)}
           >
-            <Text className="text-white text-2xl leading-none mt-[-1]">+</Text>
+            <AppSymbol name="add" size={23} color="white" />
           </TouchableOpacity>
         </View>
-        <View className="bg-gray-100 rounded-lg flex-row items-center px-3 py-2.5">
-          <Text className="text-gray-400 mr-2">🔍</Text>
+        <View className="bg-white rounded-2xl flex-row items-center px-4 py-3.5 border border-line shadow-card">
+          <AppSymbol name="search" size={18} color="#8E8E93" />
           <TextInput
             className="flex-1 text-base text-gray-800"
             placeholder="搜索姓名、公司、手机号"
@@ -328,7 +329,7 @@ export default function CustomersScreen() {
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Text className="text-gray-400 text-lg">✕</Text>
+              <Text className="text-gray-400 text-base font-semibold">×</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -342,7 +343,7 @@ export default function CustomersScreen() {
         <FlatList
           data={filtered}
           keyExtractor={item => item.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 }}
           renderItem={({ item }) => (
             <CustomerCard
               customer={item}
@@ -351,7 +352,9 @@ export default function CustomersScreen() {
           )}
           ListEmptyComponent={
             <View className="items-center justify-center mt-20">
-              <Text className="text-5xl mb-4">👥</Text>
+              <View className="w-16 h-16 rounded-3xl bg-blue-50 items-center justify-center mb-4">
+                <AppSymbol name="customers" size={30} color="#007AFF" />
+              </View>
               <Text className="text-gray-400 text-base">
                 {query ? '没有匹配的客户' : '还没有客户，点击 + 添加'}
               </Text>
