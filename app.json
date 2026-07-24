@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "客户关系管理-大卫创业导师",
+    "name": "客户管理",
     "slug": "sales-crm",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -54,7 +54,9 @@
           "imageWidth": 240,
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-status-bar"
     ],
     "extra": {
       "router": {},
