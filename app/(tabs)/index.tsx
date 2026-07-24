@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { AppSymbol, type AppSymbolName } from '../../components/AppSymbol'
 
 function getWeekRange() {
   const now = new Date()
@@ -29,8 +30,9 @@ const MONTH_END = new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0, 23, 59,
 type QuickAction = {
   title: string
   detail: string
-  icon: string
-  tone: string
+  icon: AppSymbolName
+  tint: string
+  surface: string
   route: '/(tabs)/customers' | '/(tabs)/tracking' | '/(tabs)/sales' | '/(tabs)/tasks'
 }
 
@@ -122,41 +124,45 @@ export default function DashboardScreen() {
 
   const today = TODAY.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
   const quickActions: QuickAction[] = [
-    { title: '管理客户', detail: '客户资料与类型', icon: '客', tone: 'bg-blue-500', route: '/(tabs)/customers' },
-    { title: '跟踪记录', detail: '拜访、电话、微信', icon: '跟', tone: 'bg-green-500', route: '/(tabs)/tracking' },
-    { title: '销售记录', detail: '产品销售和金额', icon: '售', tone: 'bg-purple-500', route: '/(tabs)/sales' },
-    { title: '任务管理', detail: '待办和提醒', icon: '办', tone: 'bg-amber-500', route: '/(tabs)/tasks' },
+    { title: '管理客户', detail: '客户资料与类型', icon: 'customers', tint: '#007AFF', surface: 'bg-blue-50', route: '/(tabs)/customers' },
+    { title: '跟踪记录', detail: '拜访、电话、微信', icon: 'tracking', tint: '#34A853', surface: 'bg-green-50', route: '/(tabs)/tracking' },
+    { title: '销售记录', detail: '产品销售和金额', icon: 'sales', tint: '#7C3AED', surface: 'bg-violet-50', route: '/(tabs)/sales' },
+    { title: '任务管理', detail: '待办和提醒', icon: 'tasks', tint: '#D97706', surface: 'bg-amber-50', route: '/(tabs)/tasks' },
   ]
 
   return (
-    <ScrollView className="flex-1 bg-[#F2F2F7]" contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView className="flex-1 bg-canvas" contentContainerStyle={{ paddingBottom: 40 }}>
       {/* 顶部 */}
-      <View className="bg-white px-5 pt-14 pb-5 border-b border-gray-100">
+      <View className="bg-brand-600 px-5 pt-14 pb-7">
         <View className="flex-row items-center justify-between">
           <View>
-            <Text className="text-3xl font-bold text-gray-900">首页</Text>
-            <Text className="text-gray-400 text-sm mt-0.5">{today}</Text>
+            <Text className="text-[30px] font-bold text-white tracking-tight">仪表盘</Text>
+            <View className="flex-row items-center mt-1">
+              <AppSymbol name="calendar" size={14} color="#8E8E93" />
+              <Text className="text-slate-300 text-sm ml-1.5">{today}</Text>
+            </View>
           </View>
           <TouchableOpacity
             onPress={() => setShowSettings(s => !s)}
-            className="w-10 h-10 bg-gray-100 rounded-lg items-center justify-center"
+            className="w-11 h-11 bg-white/10 rounded-full items-center justify-center border border-white/15"
           >
-            <Text className="text-gray-700 text-lg font-semibold">•••</Text>
+            <AppSymbol name="more" size={22} color="#F7F6F2" />
           </TouchableOpacity>
         </View>
 
         {showSettings && (
-          <View className="mt-4 bg-[#F2F2F7] rounded-lg overflow-hidden border border-black/5">
+          <View className="mt-4 bg-white rounded-2xl overflow-hidden border border-black/[0.04] shadow-sm">
             <View className="px-4 py-3 border-b border-gray-100">
               <Text className="text-xs text-gray-400 uppercase font-semibold">账号</Text>
               <Text className="text-gray-700 mt-1">{phone ? `+86 ${phone}` : '—'}</Text>
             </View>
             <TouchableOpacity
-              className="px-4 py-3"
+              className="px-4 py-3.5 flex-row items-center"
               onPress={handleLogout}
               activeOpacity={0.7}
             >
-              <Text className="text-red-500 font-medium">退出登录</Text>
+              <AppSymbol name="logout" size={18} color="#FF3B30" />
+              <Text className="text-red-500 font-medium ml-2">退出登录</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -164,12 +170,12 @@ export default function DashboardScreen() {
 
       {/* 统计卡片 */}
       <View className="px-4 pt-5">
-        <Text className="text-xs font-semibold text-gray-500 uppercase mb-3 px-1">概览</Text>
+        <Text className="text-sm font-semibold text-brand-600 mb-3 px-1">业务概览</Text>
         <View className="flex-row flex-wrap gap-3">
           {cards.map((card) => (
             <TouchableOpacity
               key={card.label}
-              className="bg-white rounded-lg p-4 border border-black/5"
+              className="bg-white rounded-2xl p-4 border border-line shadow-card"
               style={{ width: '47%' }}
               onPress={() => card.route && router.push(card.route)}
               activeOpacity={0.7}
@@ -189,8 +195,8 @@ export default function DashboardScreen() {
 
       {/* 快捷操作 */}
       <View className="px-4 mt-6">
-        <Text className="text-xs font-semibold text-gray-500 uppercase mb-3 px-1">快捷操作</Text>
-        <View className="bg-white rounded-lg overflow-hidden border border-black/5">
+        <Text className="text-sm font-semibold text-brand-600 mb-3 px-1">工作台</Text>
+        <View className="bg-white rounded-2xl overflow-hidden border border-line shadow-card">
           {quickActions.map((action, index) => (
             <TouchableOpacity
               key={action.title}
@@ -198,14 +204,14 @@ export default function DashboardScreen() {
               onPress={() => router.push(action.route)}
               activeOpacity={0.7}
             >
-              <View className={`w-10 h-10 rounded-lg ${action.tone} items-center justify-center mr-3`}>
-                <Text className="text-white text-base font-bold">{action.icon}</Text>
+              <View className={`w-10 h-10 rounded-xl ${action.surface} items-center justify-center mr-3`}>
+                <AppSymbol name={action.icon} size={20} color={action.tint} />
               </View>
               <View className="flex-1">
                 <Text className="text-gray-900 font-semibold">{action.title}</Text>
                 <Text className="text-gray-400 text-xs mt-0.5">{action.detail}</Text>
               </View>
-              <Text className="text-gray-300 text-xl">›</Text>
+              <AppSymbol name="chevron" size={17} color="#C7C7CC" />
             </TouchableOpacity>
           ))}
         </View>

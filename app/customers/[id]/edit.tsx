@@ -174,7 +174,7 @@ export default function EditCustomerScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-[#F2F2F7] items-center justify-center">
+      <View className="flex-1 bg-canvas items-center justify-center">
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     )
@@ -182,7 +182,7 @@ export default function EditCustomerScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-[#F2F2F7]"
+      className="flex-1 bg-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View className="bg-white px-5 pt-14 pb-4 flex-row items-center justify-between border-b border-gray-100">

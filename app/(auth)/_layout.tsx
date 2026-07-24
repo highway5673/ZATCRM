@@ -6,8 +6,8 @@ export default function AuthLayout() {
   const session = useSession()
   if (session === undefined) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#F2F2F7]">
-        <ActivityIndicator color="#007AFF" />
+      <View className="flex-1 items-center justify-center bg-canvas">
+        <ActivityIndicator color="#284D6B" />
       </View>
     )
   }

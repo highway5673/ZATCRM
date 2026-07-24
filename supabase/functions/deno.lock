@@ -1,8 +1,5 @@
 {
   "version": "5",
-  "redirects": {
-    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.110.1"
-  },
   "remote": {
     "https://deno.land/std@0.177.0/async/abortable.ts": "73acfb3ed7261ce0d930dbe89e43db8d34e017b063cf0eaa7d215477bf53442e",
     "https://deno.land/std@0.177.0/async/deadline.ts": "c5facb0b404eede83e38bd2717ea8ab34faa2ffb20ef87fd261fcba32ba307aa",
@@ -16,41 +13,5 @@
     "https://deno.land/std@0.177.0/async/tee.ts": "47e42d35f622650b02234d43803d0383a89eb4387e1b83b5a40106d18ae36757",
     "https://deno.land/std@0.177.0/http/server.ts": "cbb17b594651215ba95c01a395700684e569c165a567e4e04bba327f41197433",
     "https://esm.sh/@supabase/supabase-js@2.110.1": "3e6ac10368fe97f2b18aab157383635843c15e029846ad33a56bd754d09c2fe0"
-  },
-  "workspace": {
-    "packageJson": {
-      "dependencies": [
-        "npm:@react-native-async-storage/async-storage@2.2.0",
-        "npm:@react-native-community/datetimepicker@9.1.0",
-        "npm:@supabase/supabase-js@^2.110.1",
-        "npm:@types/react@~19.2.2",
-        "npm:babel-preset-expo@^57.0.2",
-        "npm:expo-asset@~57.0.3",
-        "npm:expo-audio@57.0",
-        "npm:expo-clipboard@57.0",
-        "npm:expo-constants@~57.0.3",
-        "npm:expo-file-system@57.0",
-        "npm:expo-linking@~57.0.2",
-        "npm:expo-location@~57.0.2",
-        "npm:expo-router@~57.0.4",
-        "npm:expo-speech@57.0",
-        "npm:expo-status-bar@57.0",
-        "npm:expo-symbols@57.0",
-        "npm:expo@~57.0.4",
-        "npm:nativewind@^4.2.6",
-        "npm:patch-package@^8.0.1",
-        "npm:react-dom@^19.2.3",
-        "npm:react-native-reanimated@4.5.0",
-        "npm:react-native-safe-area-context@5.7",
-        "npm:react-native-screens@^4.25.2",
-        "npm:react-native-url-polyfill@3",
-        "npm:react-native-web@~0.21.2",
-        "npm:react-native-worklets@0.10.0",
-        "npm:react-native@0.86.0",
-        "npm:react@19.2.3",
-        "npm:tailwindcss@^3.4.19",
-        "npm:typescript@~6.0.3"
-      ]
-    }
   }
 }

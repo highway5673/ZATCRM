@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
+import { AppSymbol } from '../../components/AppSymbol'
 import type { SalesRecord } from '../../types/database'
 
 type CustomerOption = { id: string; name: string; company: string | null }
@@ -175,7 +176,7 @@ function AddSalesModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
-        className="flex-1 bg-[#F2F2F7]"
+        className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
@@ -351,7 +352,7 @@ function AddSalesModal({
 
 function SalesCard({ item }: { item: SalesWithCustomer }) {
   return (
-    <View className="bg-white rounded-lg p-4 mb-3">
+    <View className="bg-white rounded-2xl p-4 mb-3 border border-line shadow-card">
       <View className="flex-row items-start justify-between">
         <View className="flex-1 mr-3">
           <Text className="text-gray-800 font-semibold text-base">{item.product_name}</Text>
@@ -410,28 +411,28 @@ export default function SalesScreen() {
   const monthAmount = monthRecords.reduce((s, r) => s + (r.amount ?? 0), 0)
 
   return (
-    <View className="flex-1 bg-[#F2F2F7]">
-      <View className="bg-white px-5 pt-14 pb-4">
+    <View className="flex-1 bg-canvas">
+      <View className="bg-brand-600 px-5 pt-14 pb-5">
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-3xl font-bold text-gray-900">销售</Text>
+          <Text className="text-[30px] font-bold text-white">销售</Text>
           <TouchableOpacity
-            className="bg-[#007AFF] w-9 h-9 rounded-full items-center justify-center"
+            className="bg-accent-500 w-11 h-11 rounded-full items-center justify-center"
             onPress={() => setShowAdd(true)}
           >
-            <Text className="text-white text-2xl leading-none mt-[-1]">+</Text>
+            <AppSymbol name="add" size={23} color="white" />
           </TouchableOpacity>
         </View>
 
         {records.length > 0 && (
           <View className="flex-row gap-3">
-            <View className="flex-1 bg-green-50 rounded-lg px-4 py-3">
+            <View className="flex-1 bg-green-50 rounded-2xl px-4 py-3">
               <Text className="text-xs text-green-600 font-semibold">本月销售</Text>
               <Text className="text-green-700 font-bold text-lg mt-1">
                 ¥{monthAmount.toLocaleString('zh-CN')}
               </Text>
               <Text className="text-green-400 text-xs">{monthRecords.length} 笔</Text>
             </View>
-            <View className="flex-1 bg-blue-50 rounded-lg px-4 py-3">
+            <View className="flex-1 bg-blue-50 rounded-2xl px-4 py-3">
               <Text className="text-xs text-[#007AFF] font-semibold">累计销售</Text>
               <Text className="text-[#007AFF] font-bold text-lg mt-1">
                 ¥{totalAmount.toLocaleString('zh-CN')}
@@ -454,7 +455,9 @@ export default function SalesScreen() {
           renderItem={({ item }) => <SalesCard item={item} />}
           ListEmptyComponent={
             <View className="items-center justify-center mt-20">
-              <Text className="text-5xl mb-4">💰</Text>
+              <View className="w-16 h-16 rounded-3xl bg-violet-50 items-center justify-center mb-4">
+                <AppSymbol name="sales" size={30} color="#7C3AED" />
+              </View>
               <Text className="text-gray-400 text-base">暂无销售记录，点击 + 添加</Text>
             </View>
           }

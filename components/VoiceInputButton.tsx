@@ -39,6 +39,7 @@ const FIELD_LABELS: Record<string, string> = {
   content: '内容',
   gift_name: '赠品',
   gift_quantity: '赠品数量',
+  gift_unit: '赠品单位',
   product_name: '产品',
   quantity: '数量',
   unit_price: '单价',
@@ -178,7 +179,7 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
       </TouchableOpacity>
 
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-        <View className="flex-1 bg-[#F2F2F7]">
+        <View className="flex-1 bg-canvas">
           <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
             <TouchableOpacity onPress={close} disabled={busy}>
               <Text className="text-gray-500 text-base">取消</Text>

@@ -9,6 +9,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
+import { AppSymbol } from '../../components/AppSymbol'
 import type { Task, TaskStatus } from '../../types/database'
 
 type CustomerOption = { id: string; name: string; company: string | null }
@@ -212,7 +213,7 @@ function AddTaskModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
-        className="flex-1 bg-[#F2F2F7]"
+        className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
@@ -411,7 +412,7 @@ function TaskItem({
 
   return (
     <TouchableOpacity
-      className={`rounded-lg px-4 py-3.5 mb-3 flex-row items-start border ${
+      className={`rounded-2xl px-4 py-4 mb-3 flex-row items-start border shadow-card ${
         isOverdue ? 'bg-red-50 border-red-200' : 'bg-white border-transparent'
       } ${
         isDone ? 'opacity-50' : ''
@@ -510,11 +511,11 @@ export default function TasksScreen() {
   const pendingCount = tasks.filter(t => t.status === 'pending').length
 
   return (
-    <View className="flex-1 bg-[#F2F2F7]">
-      <View className="bg-white px-5 pt-14 pb-4">
+    <View className="flex-1 bg-canvas">
+      <View className="bg-brand-600 px-5 pt-14 pb-5">
         <View className="flex-row items-center justify-between mb-4">
           <View className="flex-row items-center gap-2">
-            <Text className="text-3xl font-bold text-gray-900">任务</Text>
+            <Text className="text-[30px] font-bold text-white">任务</Text>
             {pendingCount > 0 && (
               <View className="bg-[#007AFF] rounded-full min-w-5 h-5 px-1.5 items-center justify-center">
                 <Text className="text-white text-xs font-bold">{pendingCount}</Text>
@@ -522,20 +523,20 @@ export default function TasksScreen() {
             )}
           </View>
           <TouchableOpacity
-            className="bg-[#007AFF] w-9 h-9 rounded-full items-center justify-center"
+            className="bg-accent-500 w-11 h-11 rounded-full items-center justify-center"
             onPress={() => setShowAdd(true)}
           >
-            <Text className="text-white text-2xl leading-none mt-[-1]">+</Text>
+            <AppSymbol name="add" size={23} color="white" />
           </TouchableOpacity>
         </View>
 
-        <View className="flex-row bg-gray-100 rounded-lg p-1">
+        <View className="flex-row bg-white rounded-2xl p-1.5 border border-line shadow-card">
           {FILTER_TABS.map(tab => (
             <TouchableOpacity
               key={tab.key}
               onPress={() => setFilter(tab.key as TaskStatus)}
               className={`flex-1 py-2 rounded-lg items-center ${
-                filter === tab.key ? 'bg-white ' : ''
+                filter === tab.key ? 'bg-brand-50 ' : ''
               }`}
             >
               <Text className={`text-sm font-medium ${
@@ -562,7 +563,9 @@ export default function TasksScreen() {
           )}
           ListEmptyComponent={
             <View className="items-center justify-center mt-20">
-              <Text className="text-5xl mb-4">✅</Text>
+              <View className="w-16 h-16 rounded-3xl bg-blue-50 items-center justify-center mb-4">
+                <AppSymbol name="tasks" size={30} color="#007AFF" />
+              </View>
               <Text className="text-gray-400 text-base">
                 {filter === 'pending'
                   ? '没有待办任务，点击 + 添加'

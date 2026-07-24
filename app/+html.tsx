@@ -8,7 +8,7 @@ export default function Root({ children }: PropsWithChildren) {
     <html {...htmlAttributes} lang="zh-CN">
       <head>
         {headNodes}
-        <title>客户关系管理-大卫创业导师</title>
+        <title>客户管理</title>
       </head>
       <body {...bodyAttributes}>
         {children}

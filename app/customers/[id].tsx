@@ -5,11 +5,11 @@ import {
 } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { formatLocationLabel, openNavigation, resolveAddressForCoords, resolveVisitLocation } from '../../lib/location'
+import { attachVisitLocationToTrackingRecord, formatLocationLabel, openNavigation, resolveAddressForCoords } from '../../lib/location'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import type {
-  Customer, CustomerLocation, CustomerType, TrackingMethod, SalesRecord,
+  Customer, CustomerLocation, CustomerType, TrackingMethod, SalesRecord, Task, TaskStatus,
 } from '../../types/database'
 
 const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: boolean }[] = [
@@ -33,6 +33,19 @@ const AVATAR_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber
 function formatDate(iso: string) {
   const d = new Date(iso)
   return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+const TASK_STATUS_META: Record<TaskStatus, { label: string; color: string; background: string }> = {
+  pending: { label: '待办', color: 'text-[#007AFF]', background: 'bg-blue-50' },
+  postponed: { label: '已推迟', color: 'text-amber-600', background: 'bg-amber-50' },
+  done: { label: '已完成', color: 'text-green-600', background: 'bg-green-50' },
+}
+
+function formatTaskReminder(remindAt: string | null) {
+  if (!remindAt) return '未设置提醒'
+  const date = new Date(remindAt)
+  if (Number.isNaN(date.getTime())) return '未设置提醒'
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 type TrackingRecord = {
@@ -81,14 +94,12 @@ function AddTrackingModal({
   const [giftName, setGiftName] = useState('')
   const [giftQuantity, setGiftQuantity] = useState('0')
   const [saving, setSaving] = useState(false)
-  const [gpsStatus, setGpsStatus] = useState<string | null>(null)
 
   const reset = () => {
     setMethod('phone')
     setContent('')
     setGiftName('')
     setGiftQuantity('0')
-    setGpsStatus(null)
   }
 
   const handleClose = () => { reset(); onClose() }
@@ -113,32 +124,23 @@ function AddTrackingModal({
       const { data: { user } } = await trackPerf('customerDetail.tracking.add.getUser', () => supabase.auth.getUser())
       if (!user) { setSaving(false); throw new Error('登录已失效') }
 
-      let locationId: string | null = null
-      if (nextMethod === 'visit') {
-        setGpsStatus('获取位置中...')
-        const loc = await trackPerf('customerDetail.tracking.add.resolveLocation', () =>
-          resolveVisitLocation(customerId),
-        { customerId })
-        if (loc) {
-          locationId = loc.locationId
-          setGpsStatus(loc.address ? `📍 ${loc.address}` : '📍 已记录位置')
-        } else {
-          setGpsStatus('⚠️ 无法获取位置')
-        }
-      }
-
       const { data: inserted, error } = await trackPerf('customerDetail.tracking.add.insertRecord', () =>
         supabase.from('tracking_records').insert({
           user_id: user.id,
           customer_id: customerId,
           method: nextMethod,
           content: nextContent,
-          location_id: locationId,
+          location_id: null,
           tracked_at: new Date().toISOString(),
         }).select('id').single(),
-      { method: nextMethod, hasLocation: Boolean(locationId) })
+      { method: nextMethod, locationQueued: nextMethod === 'visit' })
 
       if (error) throw error
+      if (nextMethod === 'visit' && inserted) {
+        void attachVisitLocationToTrackingRecord(customerId, inserted.id)
+          .then((location) => { if (location) onSaved() })
+          .catch(() => undefined)
+      }
       if (nextGiftName && inserted) {
         const { error: giftError } = await trackPerf('customerDetail.tracking.add.insertGift', () =>
           supabase.from('tracking_gifts').insert({
@@ -171,7 +173,7 @@ function AddTrackingModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
-        className="flex-1 bg-[#F2F2F7]"
+        className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
@@ -203,7 +205,7 @@ function AddTrackingModal({
             />
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 bg-white rounded-2xl p-4 border border-line shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪方式</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row gap-2">
@@ -225,11 +227,11 @@ function AddTrackingModal({
             </ScrollView>
             {METHOD_MAP[method]?.hasGps && (
               <Text className="text-xs text-gray-400 mt-3">
-                {gpsStatus ?? '保存时将自动记录GPS位置'}
+                保存后将自动补充GPS位置
               </Text>
             )}
           </View>
-          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 bg-white rounded-2xl p-4 border border-line shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">赠品 / 试用装</Text>
             <TextInput
               className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5 mb-3"
@@ -247,7 +249,7 @@ function AddTrackingModal({
               onChangeText={setGiftQuantity}
             />
           </View>
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl p-4 border border-line shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪内容 *</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -353,7 +355,7 @@ function AddSalesModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
-        className="flex-1 bg-[#F2F2F7]"
+        className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
@@ -385,7 +387,7 @@ function AddSalesModal({
             />
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-4 bg-white rounded-2xl overflow-hidden border border-line shadow-card">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">产品名称 *</Text>
               <TextInput
@@ -443,7 +445,7 @@ function AddSalesModal({
               />
             </View>
           </View>
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 mb-8 bg-white rounded-2xl p-4 border border-line shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -472,14 +474,15 @@ export default function CustomerDetailScreen() {
   const [customerLocations, setCustomerLocations] = useState<CustomerLocation[]>([])
   const [trackingRecords, setTrackingRecords] = useState<TrackingRecord[]>([])
   const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([])
+  const [taskRecords, setTaskRecords] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddTracking, setShowAddTracking] = useState(false)
   const [showAddSales, setShowAddSales] = useState(false)
-  const [activeTab, setActiveTab] = useState<'tracking' | 'sales' | 'trials'>('tracking')
+  const [activeTab, setActiveTab] = useState<'tracking' | 'sales' | 'trials' | 'tasks'>('tracking')
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const [customerRes, locationsRes, trackingRes, salesRes] = await trackPerf('customerDetail.fetchAll', () =>
+    const [customerRes, locationsRes, trackingRes, salesRes, tasksRes] = await trackPerf('customerDetail.fetchAll', () =>
       Promise.all([
         supabase.from('customers').select('*').eq('id', id).single(),
         supabase.from('customer_locations')
@@ -494,6 +497,10 @@ export default function CustomerDetailScreen() {
           .select('*')
           .eq('customer_id', id)
           .order('sale_date', { ascending: false }),
+        supabase.from('tasks')
+          .select('*')
+          .eq('customer_id', id)
+          .order('remind_at', { ascending: true, nullsFirst: false }),
       ]),
     { customerId: id })
 
@@ -501,6 +508,7 @@ export default function CustomerDetailScreen() {
     if (locationsRes.data) setCustomerLocations(locationsRes.data)
     if (trackingRes.data) setTrackingRecords(trackingRes.data as unknown as TrackingRecord[])
     if (salesRes.data) setSalesRecords(salesRes.data)
+    if (tasksRes.data) setTaskRecords(tasksRes.data)
     setLoading(false)
   }, [id])
 
@@ -594,7 +602,7 @@ export default function CustomerDetailScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-[#F2F2F7] items-center justify-center">
+      <View className="flex-1 bg-canvas items-center justify-center">
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     )
@@ -602,7 +610,7 @@ export default function CustomerDetailScreen() {
 
   if (!customer) {
     return (
-      <View className="flex-1 bg-[#F2F2F7] items-center justify-center">
+      <View className="flex-1 bg-canvas items-center justify-center">
         <Text className="text-gray-400">客户不存在</Text>
       </View>
     )
@@ -647,13 +655,13 @@ export default function CustomerDetailScreen() {
   })
 
   return (
-    <View className="flex-1 bg-[#F2F2F7]">
+    <View className="flex-1 bg-canvas">
       {/* 顶部导航 */}
-      <View className="bg-white px-5 pt-14 pb-4 flex-row items-center justify-between border-b border-gray-100">
+      <View className="bg-brand-600 px-5 pt-14 pb-4 flex-row items-center justify-between border-b border-brand-500">
         <TouchableOpacity onPress={() => router.back()} className="w-9 h-9 items-center justify-center">
-          <Text className="text-2xl text-[#007AFF]">‹</Text>
+          <Text className="text-2xl text-white">‹</Text>
         </TouchableOpacity>
-        <Text className="text-base font-semibold text-gray-800">客户详情</Text>
+        <Text className="text-[20px] font-semibold text-white">客户详情</Text>
         <View className="flex-row items-center gap-3">
           <TouchableOpacity onPress={handleDelete}>
             <Text className="text-red-400 text-sm">删除</Text>
@@ -663,7 +671,7 @@ export default function CustomerDetailScreen() {
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         {/* 基本信息卡 */}
-        <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+        <View className="mx-4 mt-4 bg-white rounded-2xl p-4 border border-line shadow-card">
           <View className="flex-row items-center mb-3">
             <View className={`w-14 h-14 rounded-full ${avatarColor} items-center justify-center mr-4`}>
               <Text className="text-white text-xl font-bold">{customer.name.slice(0, 1)}</Text>
@@ -709,7 +717,7 @@ export default function CustomerDetailScreen() {
         </View>
 
         {/* 客户位置 */}
-        <View className="mx-4 mt-3 bg-white rounded-lg overflow-hidden">
+        <View className="mx-4 mt-3 bg-white rounded-2xl overflow-hidden border border-line shadow-card">
           <View className="px-4 py-3 border-b border-gray-50 flex-row items-center justify-between">
             <Text className="text-sm font-semibold text-gray-800">客户位置</Text>
             <Text className="text-xs text-gray-300">{customerLocations.length} 个地址</Text>
@@ -836,12 +844,20 @@ export default function CustomerDetailScreen() {
                 试用清单 {trialItems.length > 0 ? `(${trialItems.length})` : ''}
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('tasks')}
+              className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'tasks' ? 'bg-white' : ''}`}
+            >
+              <Text className={`text-sm font-medium ${activeTab === 'tasks' ? 'text-gray-800' : 'text-gray-400'}`}>
+                任务清单 {taskRecords.length > 0 ? `(${taskRecords.length})` : ''}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* 跟踪记录列表 */}
         {activeTab === 'tracking' && (
-          <View className="mx-4 mt-3 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-3 bg-white rounded-2xl overflow-hidden border border-line shadow-card">
             {trackingRecords.length === 0 ? (
               <View className="py-10 items-center">
                 <Text className="text-gray-300 text-4xl mb-3">📋</Text>
@@ -895,7 +911,7 @@ export default function CustomerDetailScreen() {
 
         {/* 销售记录列表 */}
         {activeTab === 'sales' && (
-          <View className="mx-4 mt-3 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-3 bg-white rounded-2xl overflow-hidden border border-line shadow-card">
             {salesRecords.length === 0 ? (
               <View className="py-10 items-center">
                 <Text className="text-gray-300 text-4xl mb-3">💰</Text>
@@ -930,7 +946,7 @@ export default function CustomerDetailScreen() {
 
         {/* 试用清单 */}
         {activeTab === 'trials' && (
-          <View className="mx-4 mt-3 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-3 bg-white rounded-2xl overflow-hidden border border-line shadow-card">
             {trialItems.length === 0 ? (
               <View className="py-10 items-center">
                 <Text className="text-gray-300 text-4xl mb-3">📦</Text>
@@ -992,6 +1008,62 @@ export default function CustomerDetailScreen() {
                   )
                 })}
               </>
+            )}
+          </View>
+        )}
+
+        {/* 任务清单 */}
+        {activeTab === 'tasks' && (
+          <View className="mx-4 mt-3 bg-white rounded-2xl overflow-hidden border border-line shadow-card">
+            {taskRecords.length === 0 ? (
+              <View className="py-10 items-center">
+                <Text className="text-gray-300 text-4xl mb-3">✅</Text>
+                <Text className="text-gray-400 text-sm">暂无关联任务</Text>
+              </View>
+            ) : (
+              taskRecords.map((task, index) => {
+                const statusMeta = TASK_STATUS_META[task.status]
+                const reminderTime = task.remind_at ? new Date(task.remind_at).getTime() : Number.NaN
+                const isOverdue = task.status === 'pending' && !Number.isNaN(reminderTime) && reminderTime < Date.now()
+
+                return (
+                  <TouchableOpacity
+                    key={task.id}
+                    className={`px-4 py-3.5 ${index > 0 ? 'border-t border-gray-50' : ''} ${task.status === 'done' ? 'opacity-50' : ''}`}
+                    onPress={() => router.push(`/tasks/${task.id}`)}
+                    activeOpacity={0.75}
+                  >
+                    <View className="flex-row items-start justify-between gap-3">
+                      <View className="flex-1">
+                        <Text className={`text-sm font-semibold ${task.status === 'done' ? 'line-through text-gray-400' : isOverdue ? 'text-red-700' : 'text-gray-800'}`} numberOfLines={2}>
+                          {task.title}
+                        </Text>
+                        <View className="flex-row items-center gap-2 mt-2">
+                          <Text className={`text-xs ${isOverdue ? 'text-red-600' : 'text-gray-400'}`}>
+                            提醒：{formatTaskReminder(task.remind_at)}
+                          </Text>
+                          {isOverdue && (
+                            <View className="bg-red-100 rounded px-1.5 py-0.5">
+                              <Text className="text-red-600 text-xs font-semibold">已超时</Text>
+                            </View>
+                          )}
+                        </View>
+                        {task.notes && (
+                          <Text className="text-gray-400 text-xs mt-1.5" numberOfLines={1}>
+                            备注：{task.notes}
+                          </Text>
+                        )}
+                      </View>
+                      <View className="items-end gap-2">
+                        <View className={`${statusMeta.background} rounded-full px-2 py-1`}>
+                          <Text className={`${statusMeta.color} text-xs font-medium`}>{statusMeta.label}</Text>
+                        </View>
+                        <Text className="text-gray-300 text-lg">›</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                )
+              })
             )}
           </View>
         )}

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "客户关系管理-大卫创业导师",
+    "name": "客户管理",
     "slug": "sales-crm",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon-brand.png",
     "userInterfaceStyle": "light",
     "scheme": "sales-crm",
     "ios": {
@@ -14,12 +14,18 @@
     "android": {
       "package": "com.salescrm.app",
       "adaptiveIcon": {
-        "backgroundColor": "#1D4ED8",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#F8F3EA",
+        "foregroundImage": "./assets/app-icon-brand.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,7 +45,25 @@
           "microphonePermission": "需要访问麦克风以使用语音录入客户、跟踪、销售和任务。"
         }
       ],
-      "@react-native-community/datetimepicker"
-    ]
+      "@react-native-community/datetimepicker",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F8F3EA",
+          "image": "./assets/splash-brand.png",
+          "imageWidth": 240,
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-font",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bfbab511-a237-433f-a275-43a9caf064c1"
+      }
+    },
+    "owner": "highway5673"
   }
 }

@@ -89,7 +89,7 @@ export default function TaskDetailScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#F2F2F7]">
+      <View className="flex-1 items-center justify-center bg-canvas">
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     )
@@ -97,7 +97,7 @@ export default function TaskDetailScreen() {
 
   if (!task) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#F2F2F7] px-6">
+      <View className="flex-1 items-center justify-center bg-canvas px-6">
         <Text className="text-gray-800 text-lg font-semibold">任务不存在或已被删除</Text>
         <TouchableOpacity className="mt-5 bg-[#007AFF] rounded-lg px-5 py-3" onPress={() => router.back()}>
           <Text className="text-white font-semibold">返回任务列表</Text>
@@ -109,24 +109,24 @@ export default function TaskDetailScreen() {
   const statusMeta = STATUS_META[task.status]
 
   return (
-    <View className="flex-1 bg-[#F2F2F7]">
-      <View className="flex-row items-center justify-between px-5 pt-14 pb-4 bg-white border-b border-gray-100">
+    <View className="flex-1 bg-canvas">
+      <View className="flex-row items-center justify-between px-5 pt-14 pb-4 bg-brand-600 border-b border-brand-500">
         <TouchableOpacity className="py-1 pr-3" onPress={() => router.back()}>
-          <Text className="text-[#007AFF] text-base">‹ 任务</Text>
+          <Text className="text-white text-base font-medium">‹ 任务</Text>
         </TouchableOpacity>
-        <Text className="text-base font-semibold text-gray-900">任务详情</Text>
+        <Text className="text-[20px] font-semibold text-white">任务详情</Text>
         <View className="w-12" />
       </View>
 
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 36 }}>
-        <View className="bg-white rounded-lg p-5">
+        <View className="bg-white rounded-2xl p-5 border border-line shadow-card">
           <View className={`self-start rounded-full px-3 py-1 ${statusMeta.background}`}>
             <Text className={`text-xs font-semibold ${statusMeta.color}`}>{statusMeta.label}</Text>
           </View>
           <Text className="text-xl font-bold text-gray-900 mt-3 leading-7">{task.title}</Text>
         </View>
 
-        <View className="bg-white rounded-lg mt-4 overflow-hidden">
+        <View className="bg-white rounded-2xl mt-4 overflow-hidden border border-line shadow-card">
           <View className="px-4 py-4 border-b border-gray-50">
             <Text className="text-gray-400 text-xs mb-1">提醒时间</Text>
             <Text className="text-gray-900 text-base">{formatDateTime(task.remind_at)}</Text>
@@ -139,7 +139,7 @@ export default function TaskDetailScreen() {
 
         {task.customers ? (
           <TouchableOpacity
-            className="bg-white rounded-lg mt-4 px-4 py-4 flex-row items-center"
+            className="bg-white rounded-2xl mt-4 px-4 py-4 flex-row items-center border border-line shadow-card"
             onPress={() => router.push(`/customers/${task.customers?.id}`)}
             activeOpacity={0.75}
           >
@@ -154,7 +154,7 @@ export default function TaskDetailScreen() {
           </TouchableOpacity>
         ) : null}
 
-        <View className="bg-white rounded-lg mt-4 px-4 py-4">
+        <View className="bg-white rounded-2xl mt-4 px-4 py-4 border border-line shadow-card">
           <Text className="text-gray-400 text-xs mb-2">备注</Text>
           <Text className="text-gray-800 text-base leading-6">{task.notes || '暂无备注'}</Text>
         </View>
