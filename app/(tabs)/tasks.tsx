@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import { AppSymbol } from '../../components/AppSymbol'
+import { AppHeader, PageHeader } from '../../components/ui/AppHeader'
 import type { Task, TaskStatus } from '../../types/database'
 
 type CustomerOption = { id: string; name: string; company: string | null }
@@ -216,18 +217,16 @@ function AddTaskModal({
         className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
-          <TouchableOpacity onPress={handleClose}>
-            <Text className="text-gray-500 text-base">取消</Text>
-          </TouchableOpacity>
-          <Text className="text-base font-semibold text-gray-800">新增任务</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving
-              ? <ActivityIndicator size="small" color="#007AFF" />
-              : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
-            }
-          </TouchableOpacity>
-        </View>
+        <AppHeader
+          title="新增任务"
+          backLabel="取消"
+          onBack={handleClose}
+          actionLabel="保存"
+          onAction={handleSave}
+          actionLoading={saving}
+          actionDisabled={saving}
+          actionTone="gold"
+        />
 
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
           <View className="mx-4 mt-4">
@@ -248,7 +247,7 @@ function AddTaskModal({
             />
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">任务标题 *</Text>
               <TextInput
@@ -273,7 +272,7 @@ function AddTaskModal({
                 }}
               />
               {selectedCustomer ? (
-                <Text className="text-[#007AFF] text-xs mt-2">
+                <Text className="text-brand-700 text-sm mt-2">
                   已选择：{selectedCustomer.name}{selectedCustomer.company ? ` · ${selectedCustomer.company}` : ''}
                 </Text>
               ) : null}
@@ -287,7 +286,7 @@ function AddTaskModal({
                     }}
                     className={`px-2 py-2.5 rounded-lg border items-center ${
                       customerId === c.id
-                        ? 'bg-[#007AFF] border-[#007AFF]'
+                        ? 'bg-brand-700 border-brand-700'
                         : 'bg-white border-gray-200'
                     }`}
                     style={{ width: '31%' }}
@@ -300,7 +299,7 @@ function AddTaskModal({
                     </Text>
                     {c.company ? (
                       <Text
-                        className={`text-xs mt-0.5 text-center ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}
+                        className={`text-xs mt-0.5 text-center ${customerId === c.id ? 'text-accent-100' : 'text-gray-400'}`}
                         numberOfLines={1}
                       >
                         {c.company}
@@ -331,7 +330,7 @@ function AddTaskModal({
             </View>
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">提醒时间 *</Text>
             <View className="flex-row gap-3">
               <TouchableOpacity
@@ -361,7 +360,7 @@ function AddTaskModal({
             ) : null}
           </View>
 
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 mb-8 rounded-2xl border border-line bg-white p-4 shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -427,7 +426,7 @@ function TaskItem({
           {task.title}
         </Text>
         <View className="flex-row items-center mt-2 gap-2">
-          <Text className={`text-xs ${isOverdue ? 'text-red-600' : 'text-[#007AFF]'}`}>
+          <Text className={`text-sm ${isOverdue ? 'text-red-600' : 'text-brand-700'}`}>
             {formatTaskReminder(task.remind_at)}
           </Text>
           {isOverdue ? (
@@ -512,46 +511,35 @@ export default function TasksScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <View className="bg-brand-600 px-5 pt-14 pb-5">
-        <View className="flex-row items-center justify-between mb-4">
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[30px] font-bold text-white">任务</Text>
-            {pendingCount > 0 && (
-              <View className="bg-[#007AFF] rounded-full min-w-5 h-5 px-1.5 items-center justify-center">
-                <Text className="text-white text-xs font-bold">{pendingCount}</Text>
-              </View>
-            )}
-          </View>
-          <TouchableOpacity
-            className="bg-accent-500 w-11 h-11 rounded-full items-center justify-center"
-            onPress={() => setShowAdd(true)}
-          >
-            <AppSymbol name="add" size={23} color="white" />
-          </TouchableOpacity>
-        </View>
-
+      <PageHeader
+        title="任务"
+        subtitle={pendingCount > 0 ? `${pendingCount} 项待处理` : '待办事项与提醒'}
+        actionIcon="add"
+        actionLabel="新增"
+        onAction={() => setShowAdd(true)}
+      >
         <View className="flex-row bg-white rounded-2xl p-1.5 border border-line shadow-card">
           {FILTER_TABS.map(tab => (
             <TouchableOpacity
               key={tab.key}
               onPress={() => setFilter(tab.key as TaskStatus)}
               className={`flex-1 py-2 rounded-lg items-center ${
-                filter === tab.key ? 'bg-brand-50 ' : ''
+                filter === tab.key ? 'bg-brand-700 ' : ''
               }`}
             >
               <Text className={`text-sm font-medium ${
-                filter === tab.key ? 'text-gray-800' : 'text-gray-400'
+                filter === tab.key ? 'text-white' : 'text-gray-500'
               }`}>
                 {tab.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      </PageHeader>
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#0A3569" />
         </View>
       ) : (
         <FlatList
@@ -563,8 +551,8 @@ export default function TasksScreen() {
           )}
           ListEmptyComponent={
             <View className="items-center justify-center mt-20">
-              <View className="w-16 h-16 rounded-3xl bg-blue-50 items-center justify-center mb-4">
-                <AppSymbol name="tasks" size={30} color="#007AFF" />
+              <View className="w-16 h-16 rounded-3xl bg-brand-50 items-center justify-center mb-4">
+                <AppSymbol name="tasks" size={30} color="#0A3569" />
               </View>
               <Text className="text-gray-400 text-base">
                 {filter === 'pending'

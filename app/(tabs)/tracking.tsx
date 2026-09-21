@@ -10,6 +10,7 @@ import { attachVisitLocationToTrackingRecord, formatLocationLabel, openNavigatio
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import { AppSymbol } from '../../components/AppSymbol'
+import { AppHeader, PageHeader } from '../../components/ui/AppHeader'
 import type { CustomerLocation, TrackingMethod } from '../../types/database'
 
 const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: boolean }[] = [
@@ -214,18 +215,16 @@ function AddTrackingModal({
         className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
-          <TouchableOpacity onPress={handleClose}>
-            <Text className="text-gray-500 text-base">取消</Text>
-          </TouchableOpacity>
-          <Text className="text-base font-semibold text-gray-800">新增跟踪</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving
-              ? <ActivityIndicator size="small" color="#007AFF" />
-              : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
-            }
-          </TouchableOpacity>
-        </View>
+        <AppHeader
+          title="新增跟踪"
+          backLabel="取消"
+          onBack={handleClose}
+          actionLabel="保存"
+          onAction={handleSave}
+          actionLoading={saving}
+          actionDisabled={saving}
+          actionTone="gold"
+        />
 
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
           <View className="mx-4 mt-4">
@@ -245,7 +244,7 @@ function AddTrackingModal({
           </View>
 
           {/* 跟踪方式 */}
-          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪方式</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row gap-2">
@@ -255,7 +254,7 @@ function AddTrackingModal({
                     onPress={() => setMethod(m.key)}
                     className={`px-3 py-2.5 rounded-lg border items-center min-w-[64px] ${
                       method === m.key
-                        ? 'bg-[#007AFF] border-[#007AFF]'
+                        ? 'bg-brand-700 border-brand-700'
                         : 'bg-white border-gray-200'
                     }`}
                   >
@@ -276,7 +275,7 @@ function AddTrackingModal({
 
           {/* 关联客户 */}
           {!defaultCustomerId && (
-            <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+            <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">关联客户 *</Text>
               {customers.length === 0 ? (
                 <Text className="text-gray-400 text-sm">请先在客户页添加客户</Text>
@@ -293,7 +292,7 @@ function AddTrackingModal({
                     }}
                   />
                   {selectedCustomer ? (
-                    <Text className="text-[#007AFF] text-xs mt-2">
+                    <Text className="text-brand-700 text-sm mt-2">
                       已选择：{selectedCustomer.name}{selectedCustomer.company ? ` · ${selectedCustomer.company}` : ''}
                     </Text>
                   ) : null}
@@ -306,7 +305,7 @@ function AddTrackingModal({
                           setCustomerSearch(c.name)
                         }}
                         className={`px-2 py-2.5 rounded-lg border items-center ${
-                          customerId === c.id ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
+                          customerId === c.id ? 'bg-brand-700 border-brand-700' : 'bg-white border-gray-200'
                         }`}
                         style={{ width: '31%' }}
                       >
@@ -318,7 +317,7 @@ function AddTrackingModal({
                         </Text>
                         {c.company && (
                           <Text
-                            className={`text-xs mt-0.5 text-center ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}
+                            className={`text-xs mt-0.5 text-center ${customerId === c.id ? 'text-accent-100' : 'text-gray-400'}`}
                             numberOfLines={1}
                           >
                             {c.company}
@@ -336,7 +335,7 @@ function AddTrackingModal({
           )}
 
           {/* 赠品 */}
-          <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">赠品 / 试用装</Text>
             <TextInput
               className="text-base text-gray-900 border border-gray-100 rounded-lg px-3 py-2.5 mb-3"
@@ -372,7 +371,7 @@ function AddTrackingModal({
           </View>
 
           {/* 跟踪内容 */}
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 mb-8 rounded-2xl border border-line bg-white p-4 shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">跟踪内容 *</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -394,11 +393,8 @@ function AddTrackingModal({
 
 function TrackingCard({ item }: { item: TrackingWithCustomer }) {
   const m = METHOD_MAP[item.method]
-  const savedAddressLocation = item.customers?.customer_locations?.find(loc => loc.address?.trim())
-  const visitLocation = item.customer_locations ?? savedAddressLocation
-  const locationLabel = item.customer_locations?.address?.trim()
-    || savedAddressLocation?.address?.trim()
-    || (visitLocation ? formatLocationLabel(visitLocation) : '')
+  const visitLocation = item.customer_locations
+  const locationLabel = visitLocation ? formatLocationLabel(visitLocation) : ''
 
   return (
     <View className="bg-white rounded-2xl p-4 mb-3 border border-line shadow-card">
@@ -423,7 +419,7 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
             📍 {locationLabel}
           </Text>
           <TouchableOpacity
-            className="px-2.5 py-1 rounded-full bg-blue-50"
+            className="min-h-10 flex-row items-center rounded-xl border border-brand-600 px-3"
             onPress={() => openNavigation(
               visitLocation.latitude,
               visitLocation.longitude,
@@ -431,13 +427,14 @@ function TrackingCard({ item }: { item: TrackingWithCustomer }) {
             )}
             activeOpacity={0.75}
           >
-            <Text className="text-[#007AFF] text-xs font-semibold">导航</Text>
+            <AppSymbol name="navigate" size={16} color="#0A3569" />
+            <Text className="ml-1 text-brand-700 text-sm font-semibold">导航</Text>
           </TouchableOpacity>
         </View>
       )}
       {item.tracking_gifts?.length ? (
-        <View className="mt-2 rounded-lg bg-amber-50 px-3 py-2">
-          <Text className="text-amber-700 text-xs">
+        <View className="mt-2 rounded-xl bg-accent-50 px-3 py-2">
+          <Text className="text-accent-700 text-sm">
             赠品：{item.tracking_gifts.map(gift => `${gift.name} x${gift.quantity}${gift.unit ?? ''}`).join('，')}
           </Text>
         </View>
@@ -458,7 +455,7 @@ export default function TrackingScreen() {
     const { data, error } = await trackPerf('tracking.fetchList', () =>
       supabase
         .from('tracking_records')
-        .select('*, customers(name, company, customer_locations(address, latitude, longitude)), customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity)')
+        .select('*, customers(name, company), customer_locations(address, latitude, longitude), tracking_gifts(id, name, quantity, unit)')
         .order('tracked_at', { ascending: false })
         .limit(100))
 
@@ -482,17 +479,7 @@ export default function TrackingScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <View className="bg-brand-600 px-5 pt-14 pb-5">
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-[30px] font-bold text-white">跟踪</Text>
-          <TouchableOpacity
-            className="bg-accent-500 w-11 h-11 rounded-full items-center justify-center"
-            onPress={() => setShowAdd(true)}
-          >
-            <AppSymbol name="add" size={23} color="white" />
-          </TouchableOpacity>
-        </View>
-
+      <PageHeader title="跟踪" actionIcon="add" actionLabel="新增" onAction={() => setShowAdd(true)}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View className="flex-row gap-2">
             {FILTER_OPTIONS.map(opt => (
@@ -501,7 +488,7 @@ export default function TrackingScreen() {
                 onPress={() => setFilter(opt.key)}
                 className={`px-4 py-1.5 rounded-full border ${
                   filter === opt.key
-                    ? 'bg-[#007AFF] border-[#007AFF]'
+                    ? 'bg-brand-700 border-brand-700'
                     : 'bg-white border-gray-200'
                 }`}
               >
@@ -512,11 +499,11 @@ export default function TrackingScreen() {
             ))}
           </View>
         </ScrollView>
-      </View>
+      </PageHeader>
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#0A3569" />
         </View>
       ) : (
         <FlatList

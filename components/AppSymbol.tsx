@@ -16,6 +16,16 @@ const SYMBOLS = {
   sparkle: { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' },
   phone: { ios: 'phone.fill', android: 'call', web: 'call' },
   clock: { ios: 'clock.fill', android: 'schedule', web: 'schedule' },
+  back: { ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' },
+  edit: { ios: 'pencil', android: 'edit', web: 'edit' },
+  location: { ios: 'mappin.and.ellipse', android: 'location_on', web: 'location_on' },
+  navigate: { ios: 'location.fill', android: 'navigation', web: 'navigation' },
+  building: { ios: 'building.2.fill', android: 'business', web: 'business' },
+  customer: { ios: 'person.fill', android: 'person', web: 'person' },
+  check: { ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' },
+  target: { ios: 'target', android: 'track_changes', web: 'track_changes' },
+  delete: { ios: 'trash.fill', android: 'delete', web: 'delete' },
+  microphone: { ios: 'mic.fill', android: 'mic', web: 'mic' },
 } as const
 
 export type AppSymbolName = keyof typeof SYMBOLS
@@ -23,7 +33,7 @@ export type AppSymbolName = keyof typeof SYMBOLS
 export function AppSymbol({
   name,
   size = 22,
-  color = '#007AFF',
+  color = '#0A3569',
   style,
 }: {
   name: AppSymbolName

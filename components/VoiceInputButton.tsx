@@ -16,6 +16,8 @@ import {
   useAudioRecorderState,
 } from 'expo-audio'
 import { parseVoiceFormAudio, type VoiceFormType, type VoiceParsedFields } from '../lib/voice'
+import { AppHeader } from './ui/AppHeader'
+import { AppSymbol } from './AppSymbol'
 
 type VoiceInputButtonProps<T extends VoiceParsedFields> = {
   formType: VoiceFormType
@@ -163,13 +165,13 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
   return (
     <>
       <TouchableOpacity
-        className="flex-row items-center rounded-lg bg-[#111827] px-4 py-3"
+        className="min-h-[56px] flex-row items-center rounded-2xl bg-brand-800 px-4 py-3 shadow-card"
         onPress={open}
         disabled={disabled}
         activeOpacity={0.85}
       >
-        <View className="w-9 h-9 rounded-full bg-white/10 items-center justify-center mr-3">
-          <Text className="text-white text-lg">◉</Text>
+        <View className="w-10 h-10 rounded-full bg-accent-500 items-center justify-center mr-3">
+          <AppSymbol name="microphone" size={20} color="#FFFFFF" />
         </View>
         <View className="flex-1">
           <Text className="text-white text-base font-semibold">语音录入</Text>
@@ -180,16 +182,10 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
 
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
         <View className="flex-1 bg-canvas">
-          <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
-            <TouchableOpacity onPress={close} disabled={busy}>
-              <Text className="text-gray-500 text-base">取消</Text>
-            </TouchableOpacity>
-            <Text className="text-base font-semibold text-gray-900">{title}</Text>
-            <View className="w-10" />
-          </View>
+          <AppHeader title={title} backLabel="取消" onBack={close} actionDisabled={busy} />
 
           <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-            <View className="bg-[#0B0B0F] rounded-lg p-4 min-h-[260px]">
+            <View className="bg-brand-900 rounded-2xl p-4 min-h-[260px]">
               <View className="flex-row items-center justify-between mb-4">
                 <View>
                   <Text className="text-white text-lg font-semibold">台词提示器</Text>
@@ -219,7 +215,7 @@ export function VoiceInputButton<T extends VoiceParsedFields>({
 
             <TouchableOpacity
               className={`mt-4 rounded-lg py-4 items-center ${
-                recorderState.isRecording ? 'bg-red-500' : 'bg-[#007AFF]'
+                recorderState.isRecording ? 'bg-red-500' : 'bg-accent-500'
               }`}
               onPress={recorderState.isRecording ? stopAndRecognize : startRecording}
               disabled={busy}

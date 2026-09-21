@@ -13,6 +13,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { perfLog, perfNow, trackPerf } from '../../../lib/perf'
 import { supabase } from '../../../lib/supabase'
+import { AppHeader } from '../../../components/ui/AppHeader'
 
 export default function AddTrialScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -84,21 +85,19 @@ export default function AddTrialScreen() {
       className="flex-1 bg-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View className="bg-white px-5 pt-14 pb-4 flex-row items-center justify-between border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="w-14">
-          <Text className="text-[#007AFF] text-base">取消</Text>
-        </TouchableOpacity>
-        <Text className="text-base font-semibold text-gray-800">新增试用</Text>
-        <TouchableOpacity onPress={save} disabled={saving} className="w-14 items-end">
-          {saving
-            ? <ActivityIndicator size="small" color="#007AFF" />
-            : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
-          }
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        title="新增试用"
+        backLabel="取消"
+        onBack={() => router.back()}
+        actionLabel="保存"
+        onAction={save}
+        actionLoading={saving}
+        actionDisabled={saving}
+        actionTone="gold"
+      />
 
       <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 36 }}>
-        <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
+        <View className="mx-4 mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
           <View className="px-4 pt-4 pb-2 border-b border-gray-50">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">试用品名称 *</Text>
             <TextInput
@@ -135,7 +134,7 @@ export default function AddTrialScreen() {
           </View>
         </View>
 
-        <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+        <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
           <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
           <TextInput
             className="text-base text-gray-900"

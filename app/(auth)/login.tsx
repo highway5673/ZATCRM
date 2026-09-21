@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
@@ -125,11 +126,14 @@ export default function LoginScreen() {
         className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-1 justify-center px-6">
-          <View className="w-14 h-14 rounded-2xl bg-brand-600 items-center justify-center mb-6">
-            <Text className="text-accent-100 text-xl font-bold">CRM</Text>
-          </View>
-          <Text className="text-3xl font-bold text-gray-900 mb-2">销售工作台</Text>
+        <SafeAreaView edges={['top', 'bottom']} className="flex-1">
+          <View className="flex-1 justify-center px-6">
+          <Image
+            source={require('../../assets/app-icon-brand.png')}
+            style={{ width: 96, height: 96, borderRadius: 24, marginBottom: 24 }}
+            resizeMode="contain"
+          />
+          <Text className="text-3xl font-bold text-brand-900 mb-2">销售工作台</Text>
           <Text className="text-gray-500 text-base mb-10">客户、跟踪、销售与任务，一处高效管理</Text>
 
           <Text className="text-sm font-semibold text-gray-600 mb-2">手机号</Text>
@@ -148,7 +152,7 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            className="bg-brand-600 rounded-2xl min-h-12 py-3.5 items-center justify-center"
+            className="bg-accent-500 rounded-2xl min-h-[54px] py-3.5 items-center justify-center shadow-card"
             onPress={handleSendOtp}
             disabled={loading}
             activeOpacity={0.85}
@@ -162,7 +166,8 @@ export default function LoginScreen() {
           <Text className="text-center text-gray-400 text-xs mt-6 leading-5">
             首次登录将自动创建账号{'\n'}无需单独注册
           </Text>
-        </View>
+          </View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     )
   }
@@ -172,12 +177,13 @@ export default function LoginScreen() {
       className="flex-1 bg-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View className="flex-1 justify-center px-6">
+      <SafeAreaView edges={['top', 'bottom']} className="flex-1">
+        <View className="flex-1 justify-center px-6">
         <TouchableOpacity onPress={() => { setStep('phone'); setOtp(['', '', '', '', '', '']) }} className="mb-8">
-          <Text className="text-primary-600 text-base">‹ 修改手机号</Text>
+          <Text className="text-brand-700 text-base font-semibold">‹ 修改手机号</Text>
         </TouchableOpacity>
 
-        <Text className="text-2xl font-bold text-gray-900 mb-2">输入验证码</Text>
+        <Text className="text-2xl font-bold text-brand-900 mb-2">输入验证码</Text>
         <Text className="text-gray-500 text-base mb-8">已发送至 +86 {normalizedPhone}</Text>
 
         <View className="flex-row justify-between mb-8">
@@ -186,7 +192,7 @@ export default function LoginScreen() {
               key={i}
               ref={ref => { otpRefs.current[i] = ref }}
               className={`w-12 h-14 bg-white rounded-xl text-center text-xl font-bold text-gray-900 border-2 ${
-                digit ? 'border-primary-600' : 'border-transparent'
+                digit ? 'border-accent-500' : 'border-line'
               }`}
               keyboardType="number-pad"
               maxLength={2}
@@ -199,7 +205,7 @@ export default function LoginScreen() {
 
         {loading && (
           <View className="items-center mb-4">
-            <ActivityIndicator color="#007AFF" />
+            <ActivityIndicator color="#C9951D" />
           </View>
         )}
 
@@ -208,11 +214,12 @@ export default function LoginScreen() {
           disabled={countdown > 0}
           className="items-center"
         >
-          <Text className={`text-base ${countdown > 0 ? 'text-gray-400' : 'text-primary-600'}`}>
+          <Text className={`text-base font-semibold ${countdown > 0 ? 'text-gray-400' : 'text-brand-700'}`}>
             {countdown > 0 ? `${countdown}秒后可重新获取` : '重新获取验证码'}
           </Text>
         </TouchableOpacity>
-      </View>
+        </View>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   )
 }

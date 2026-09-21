@@ -5,7 +5,7 @@ import { useSession } from '../../lib/session'
 import { AppSymbol, type AppSymbolName } from '../../components/AppSymbol'
 
 function TabIcon({ name, focused }: { name: AppSymbolName; focused: boolean }) {
-  return <AppSymbol name={name} size={23} color={focused ? '#D5A64A' : '#A9B6C2'} />
+  return <AppSymbol name={name} size={24} color={focused ? '#D8AA34' : '#A9B6C2'} />
 }
 
 export default function TabsLayout() {
@@ -27,14 +27,14 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#D5A64A',
+        tabBarActiveTintColor: '#D8AA34',
         tabBarInactiveTintColor: '#A9B6C2',
         tabBarStyle: {
           height: 66 + bottomInset,
           paddingTop: 8,
           paddingBottom: bottomInset,
-          backgroundColor: '#17324D',
-          borderTopColor: '#284D6B',
+          backgroundColor: '#082B57',
+          borderTopColor: '#194F88',
         },
         tabBarItemStyle: {
           minHeight: 58,
@@ -45,8 +45,8 @@ export default function TabsLayout() {
           marginTop: 1,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          lineHeight: 17,
+          fontSize: 13,
+          lineHeight: 18,
           fontWeight: '600',
           marginTop: 2,
         },

@@ -2,6 +2,7 @@ import '../global.css'
 import Constants from 'expo-constants'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context'
 import { SessionProvider } from '../lib/session'
 
 // Expo Go cannot customize native splash animations. Keep the animation for
@@ -15,8 +16,10 @@ if (!Constants.expoGoConfig) {
 
 export default function RootLayout() {
   return (
-    <SessionProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </SessionProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <SessionProvider>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FAF8F3' } }} />
+      </SessionProvider>
+    </SafeAreaProvider>
   )
 }

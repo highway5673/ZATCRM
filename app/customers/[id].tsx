@@ -8,8 +8,10 @@ import { supabase } from '../../lib/supabase'
 import { attachVisitLocationToTrackingRecord, formatLocationLabel, openNavigation, resolveAddressForCoords } from '../../lib/location'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
+import { AppSymbol } from '../../components/AppSymbol'
+import { AppHeader } from '../../components/ui/AppHeader'
 import type {
-  Customer, CustomerLocation, CustomerType, TrackingMethod, SalesRecord, Task, TaskStatus,
+  Customer, CustomerLocation, TrackingMethod, SalesRecord, Task, TaskStatus,
 } from '../../types/database'
 
 const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: boolean }[] = [
@@ -21,23 +23,20 @@ const METHODS: { key: TrackingMethod; label: string; emoji: string; hasGps: bool
 ]
 const METHOD_MAP = Object.fromEntries(METHODS.map(m => [m.key, m]))
 
-const CUSTOMER_TYPES: CustomerType[] = ['潜在伙伴', '客户', '伙伴']
-const TYPE_STYLE: Record<CustomerType, { bg: string; text: string }> = {
-  '潜在伙伴': { bg: 'bg-gray-100', text: 'text-gray-500' },
-  '客户':     { bg: 'bg-blue-50',  text: 'text-[#007AFF]' },
-  '伙伴':     { bg: 'bg-green-50', text: 'text-green-600' },
-}
-
-const AVATAR_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500']
-
 function formatDate(iso: string) {
   const d = new Date(iso)
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+function formatVisitDate(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '日期未知'
+  return `${date.getMonth() + 1}月${date.getDate()}日`
+}
+
 const TASK_STATUS_META: Record<TaskStatus, { label: string; color: string; background: string }> = {
-  pending: { label: '待办', color: 'text-[#007AFF]', background: 'bg-blue-50' },
-  postponed: { label: '已推迟', color: 'text-amber-600', background: 'bg-amber-50' },
+  pending: { label: '待办', color: 'text-brand-700', background: 'bg-brand-50' },
+  postponed: { label: '已推迟', color: 'text-accent-700', background: 'bg-accent-50' },
   done: { label: '已完成', color: 'text-green-600', background: 'bg-green-50' },
 }
 
@@ -176,18 +175,16 @@ function AddTrackingModal({
         className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
-          <TouchableOpacity onPress={handleClose}>
-            <Text className="text-gray-500 text-base">取消</Text>
-          </TouchableOpacity>
-          <Text className="text-base font-semibold text-gray-800">新增跟踪</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving
-              ? <ActivityIndicator size="small" color="#007AFF" />
-              : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
-            }
-          </TouchableOpacity>
-        </View>
+        <AppHeader
+          title="新增跟踪"
+          backLabel="取消"
+          onBack={handleClose}
+          actionLabel="保存"
+          onAction={handleSave}
+          actionLoading={saving}
+          actionDisabled={saving}
+          actionTone="gold"
+        />
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
           <View className="mx-4 mt-4">
             <VoiceInputButton<TrackingVoiceFields>
@@ -214,7 +211,7 @@ function AddTrackingModal({
                     key={m.key}
                     onPress={() => setMethod(m.key)}
                     className={`px-3 py-2.5 rounded-lg border items-center min-w-[64px] ${
-                      method === m.key ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
+                      method === m.key ? 'bg-brand-700 border-brand-700' : 'bg-white border-gray-200'
                     }`}
                   >
                     <Text className="text-lg">{m.emoji}</Text>
@@ -358,18 +355,16 @@ function AddSalesModal({
         className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
-          <TouchableOpacity onPress={handleClose}>
-            <Text className="text-gray-500 text-base">取消</Text>
-          </TouchableOpacity>
-          <Text className="text-base font-semibold text-gray-800">新增销售</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving
-              ? <ActivityIndicator size="small" color="#007AFF" />
-              : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
-            }
-          </TouchableOpacity>
-        </View>
+        <AppHeader
+          title="新增销售"
+          backLabel="取消"
+          onBack={handleClose}
+          actionLabel="保存"
+          onAction={handleSave}
+          actionLoading={saving}
+          actionDisabled={saving}
+          actionTone="gold"
+        />
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
           <View className="mx-4 mt-4">
             <VoiceInputButton<SalesVoiceFields>
@@ -603,7 +598,7 @@ export default function CustomerDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 bg-canvas items-center justify-center">
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#0A3569" />
       </View>
     )
   }
@@ -616,9 +611,19 @@ export default function CustomerDetailScreen() {
     )
   }
 
-  const typeStyle = TYPE_STYLE[customer.customer_type] ?? TYPE_STYLE['潜在伙伴']
-  const avatarColor = AVATAR_COLORS[customer.name.charCodeAt(0) % AVATAR_COLORS.length]
   const totalSales = salesRecords.reduce((s, r) => s + (r.amount ?? 0), 0)
+  const locationSummaries = customerLocations
+    .map((location) => {
+      const visits = trackingRecords
+        .filter(record => record.method === 'visit' && record.location_id === location.id)
+        .sort((left, right) => new Date(right.tracked_at).getTime() - new Date(left.tracked_at).getTime())
+      return {
+        location,
+        visitCount: visits.length,
+        lastVisitedAt: visits[0]?.tracked_at ?? location.created_at,
+      }
+    })
+    .sort((left, right) => new Date(right.lastVisitedAt).getTime() - new Date(left.lastVisitedAt).getTime())
   const trialItems: TrialItem[] = trackingRecords.flatMap((rec) =>
     (rec.tracking_gifts ?? []).map((gift) => ({
       id: gift.id,
@@ -656,117 +661,155 @@ export default function CustomerDetailScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      {/* 顶部导航 */}
-      <View className="bg-brand-600 px-5 pt-14 pb-4 flex-row items-center justify-between border-b border-brand-500">
-        <TouchableOpacity onPress={() => router.back()} className="w-9 h-9 items-center justify-center">
-          <Text className="text-2xl text-white">‹</Text>
-        </TouchableOpacity>
-        <Text className="text-[20px] font-semibold text-white">客户详情</Text>
-        <View className="flex-row items-center gap-3">
-          <TouchableOpacity onPress={handleDelete}>
-            <Text className="text-red-400 text-sm">删除</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <AppHeader
+        title="客户详情"
+        onBack={() => router.back()}
+        actionLabel="编辑"
+        actionIcon="edit"
+        onAction={() => router.push(`/customers/${id}/edit`)}
+      />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         {/* 基本信息卡 */}
-        <View className="mx-4 mt-4 bg-white rounded-2xl p-4 border border-line shadow-card">
-          <View className="flex-row items-center mb-3">
-            <View className={`w-14 h-14 rounded-full ${avatarColor} items-center justify-center mr-4`}>
-              <Text className="text-white text-xl font-bold">{customer.name.slice(0, 1)}</Text>
+        <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-5 shadow-card">
+          <View className="mb-4 flex-row items-center">
+            <View className="mr-4 h-[68px] w-[68px] items-center justify-center rounded-full border-2 border-accent-300 bg-brand-700">
+              <Text className="text-2xl font-bold text-white">{customer.name.slice(0, 1)}</Text>
             </View>
             <View className="flex-1">
-              <View className="flex-row items-center gap-2">
-                <Text className="text-xl font-bold text-gray-900">{customer.name}</Text>
-                <View className={`${typeStyle.bg} rounded-full px-2.5 py-0.5`}>
-                  <Text className={`${typeStyle.text} text-xs font-medium`}>{customer.customer_type}</Text>
+              <View className="flex-row flex-wrap items-center gap-2">
+                <Text className="text-2xl font-bold text-brand-900">{customer.name}</Text>
+                <View className="rounded-full bg-accent-100 px-3 py-1">
+                  <Text className="text-sm font-semibold text-accent-700">{customer.customer_type}</Text>
                 </View>
-                <TouchableOpacity
-                  className="rounded-full bg-blue-50 px-2.5 py-0.5"
-                  onPress={() => router.push(`/customers/${id}/edit`)}
-                  activeOpacity={0.75}
-                >
-                  <Text className="text-[#007AFF] text-xs font-semibold">编辑</Text>
-                </TouchableOpacity>
               </View>
               {customer.company ? (
-                <Text className="text-gray-500 mt-0.5">{customer.company}</Text>
+                <Text className="mt-1 text-base text-gray-500">{customer.company}</Text>
               ) : null}
             </View>
           </View>
 
           {customer.phone && (
-            <View className="flex-row items-center py-2.5 border-t border-gray-50">
-              <Text className="text-gray-400 text-sm w-14">手机</Text>
-              <Text className="text-gray-700 text-sm">{customer.phone}</Text>
+            <View className="min-h-12 flex-row items-center border-t border-gray-100 py-3">
+              <AppSymbol name="phone" size={18} color="#0A3569" />
+              <Text className="ml-3 w-14 text-sm text-gray-400">手机</Text>
+              <Text className="flex-1 text-base text-gray-700">{customer.phone}</Text>
             </View>
           )}
           {customer.wechat && (
-            <View className="flex-row items-center py-2.5 border-t border-gray-50">
-              <Text className="text-gray-400 text-sm w-14">微信</Text>
-              <Text className="text-gray-700 text-sm">{customer.wechat}</Text>
+            <View className="min-h-12 flex-row items-center border-t border-gray-100 py-3">
+              <AppSymbol name="tracking" size={18} color="#0A3569" />
+              <Text className="ml-3 w-14 text-sm text-gray-400">微信</Text>
+              <Text className="flex-1 text-base text-gray-700">{customer.wechat}</Text>
             </View>
           )}
           {customer.notes && (
-            <View className="pt-2.5 border-t border-gray-50">
-              <Text className="text-gray-400 text-sm mb-1">备注</Text>
-              <Text className="text-gray-600 text-sm leading-5">{customer.notes}</Text>
+            <View className="border-t border-gray-100 pt-3">
+              <Text className="mb-1 text-sm font-medium text-gray-400">备注</Text>
+              <Text className="text-base leading-6 text-gray-600">{customer.notes}</Text>
             </View>
           )}
+
+          <TouchableOpacity className="mt-4 self-start py-2" onPress={handleDelete} activeOpacity={0.7}>
+            <Text className="text-sm font-semibold text-red-500">删除客户</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 业务概览 */}
+        <View className="mx-4 mt-3 rounded-2xl border border-line bg-white p-5 shadow-card">
+          <Text className="mb-4 text-lg font-bold text-brand-800">业务概览</Text>
+          <View className="flex-row">
+            <View className="flex-1 items-center border-r border-line px-2">
+              <AppSymbol name="tracking" size={23} color="#0A3569" />
+              <Text className="mt-2 text-2xl font-bold text-brand-800">{trackingRecords.length}</Text>
+              <Text className="mt-0.5 text-sm text-gray-500">跟踪</Text>
+            </View>
+            <View className="flex-1 items-center border-r border-line px-2">
+              <AppSymbol name="sales" size={23} color="#C9951D" />
+              <Text className="mt-2 text-2xl font-bold text-brand-800">{salesRecords.length}</Text>
+              <Text className="mt-0.5 text-sm text-gray-500">销售</Text>
+            </View>
+            <View className="flex-1 items-center px-2">
+              <AppSymbol name="tasks" size={23} color="#0A3569" />
+              <Text className="mt-2 text-2xl font-bold text-brand-800">{taskRecords.length}</Text>
+              <Text className="mt-0.5 text-sm text-gray-500">任务</Text>
+            </View>
+          </View>
+          {totalSales > 0 ? (
+            <View className="mt-4 rounded-xl bg-accent-50 px-4 py-3">
+              <Text className="text-sm text-accent-700">累计销售</Text>
+              <Text className="mt-0.5 text-xl font-bold text-accent-700">
+                ¥{totalSales.toLocaleString('zh-CN')}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* 客户位置 */}
-        <View className="mx-4 mt-3 bg-white rounded-2xl overflow-hidden border border-line shadow-card">
-          <View className="px-4 py-3 border-b border-gray-50 flex-row items-center justify-between">
-            <Text className="text-sm font-semibold text-gray-800">客户位置</Text>
-            <Text className="text-xs text-gray-300">{customerLocations.length} 个地址</Text>
+        <View className="mx-4 mt-3 rounded-2xl border border-line bg-white p-4 shadow-card">
+          <View className="mb-4 flex-row items-center justify-between">
+            <View className="flex-row items-center">
+              <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-accent-50">
+                <AppSymbol name="location" size={22} color="#C9951D" />
+              </View>
+              <View className="flex-row items-baseline">
+                <Text className="text-lg font-bold text-brand-800">客户位置</Text>
+                <Text className="ml-2 text-sm font-medium text-gray-500">{locationSummaries.length} 个地点</Text>
+              </View>
+            </View>
+            {locationSummaries.length > 1 ? (
+              <Text className="text-sm text-gray-400">最近拜访优先</Text>
+            ) : null}
           </View>
-          {customerLocations.length === 0 ? (
-            <View className="px-4 py-4">
-              <Text className="text-gray-400 text-sm">暂无位置记录，上门拜访时会自动记录</Text>
+          {locationSummaries.length === 0 ? (
+            <View className="items-center rounded-xl border border-dashed border-line bg-canvas px-4 py-6">
+              <AppSymbol name="location" size={26} color="#BCC5CE" />
+              <Text className="mt-2 text-center text-sm text-gray-400">
+                暂无位置记录，上门拜访时会自动记录
+              </Text>
             </View>
           ) : (
-            customerLocations.map((loc, index) => (
-              <TouchableOpacity
-                key={loc.id}
-                className={`px-4 py-3.5 flex-row items-center ${index > 0 ? 'border-t border-gray-50' : ''}`}
-                onPress={() => openNavigation(loc.latitude, loc.longitude, loc.address)}
-                activeOpacity={0.75}
-              >
-                <View className="w-9 h-9 rounded-lg bg-blue-50 items-center justify-center mr-3">
-                  <Text className="text-[#007AFF] text-base">⌖</Text>
+            <View className="gap-3">
+              {locationSummaries.map(({ location, visitCount, lastVisitedAt }, index) => (
+                <View
+                  key={location.id}
+                  className={`rounded-xl border p-3.5 ${index === 0 ? 'border-accent-200 bg-accent-50/40' : 'border-line bg-white'}`}
+                >
+                  <View className="flex-row items-center">
+                    <View className={`mr-3 h-11 w-11 items-center justify-center rounded-full ${index === 0 ? 'bg-accent-100' : 'bg-brand-50'}`}>
+                      <AppSymbol name="location" size={21} color={index === 0 ? '#A97714' : '#0A3569'} />
+                    </View>
+                    <View className="flex-1 pr-2">
+                      <View className="mb-1 flex-row flex-wrap items-center gap-2">
+                        <Text className="text-sm font-semibold text-brand-800">
+                          {index === 0 ? '最近拜访地点' : `拜访地点 ${index + 1}`}
+                        </Text>
+                        {index === 0 ? (
+                          <View className="rounded-full bg-accent-500 px-2 py-0.5">
+                            <Text className="text-xs font-semibold text-white">最近</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text className="text-base font-semibold leading-6 text-gray-800" numberOfLines={2}>
+                        {location.address?.trim() || '正在解析地址'}
+                      </Text>
+                      <Text className="mt-1 text-sm text-gray-400">
+                        {location.address?.trim()
+                          ? `最近拜访 ${formatVisitDate(lastVisitedAt)}${visitCount > 0 ? ` · 累计 ${visitCount} 次` : ''}`
+                          : '地址解析中，稍后自动更新'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      className="min-h-11 flex-row items-center rounded-xl border border-brand-600 px-3"
+                      onPress={() => openNavigation(location.latitude, location.longitude, location.address)}
+                      activeOpacity={0.75}
+                    >
+                      <AppSymbol name="navigate" size={17} color="#0A3569" />
+                      <Text className="ml-1.5 text-sm font-semibold text-brand-700">导航</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View className="flex-1 mr-3">
-                  <Text className="text-gray-800 text-sm font-medium" numberOfLines={1}>
-                    {loc.address?.trim() || '正在解析地址'}
-                  </Text>
-                  <Text className="text-gray-300 text-xs mt-0.5">
-                    {loc.address?.trim() ? '点击打开导航' : '地址解析中，稍后自动更新'}
-                  </Text>
-                </View>
-                <Text className="text-[#007AFF] text-sm font-semibold">导航</Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
-
-        {/* 统计栏 */}
-        <View className="mx-4 mt-3 flex-row gap-3">
-          <View className="flex-1 bg-white rounded-lg px-4 py-3 items-center">
-            <Text className="text-[#007AFF] font-bold text-xl">{trackingRecords.length}</Text>
-            <Text className="text-gray-400 text-xs mt-0.5">跟踪记录</Text>
-          </View>
-          <View className="flex-1 bg-white rounded-lg px-4 py-3 items-center">
-            <Text className="text-green-600 font-bold text-xl">{salesRecords.length}</Text>
-            <Text className="text-gray-400 text-xs mt-0.5">销售记录</Text>
-          </View>
-          {totalSales > 0 && (
-            <View className="flex-1 bg-white rounded-lg px-4 py-3 items-center">
-              <Text className="text-purple-600 font-bold text-base">
-                ¥{totalSales >= 10000 ? `${(totalSales / 10000).toFixed(1)}万` : totalSales.toLocaleString()}
-              </Text>
-              <Text className="text-gray-400 text-xs mt-0.5">累计销售</Text>
+              ))}
             </View>
           )}
         </View>
@@ -774,82 +817,84 @@ export default function CustomerDetailScreen() {
         {/* 快捷操作 */}
         <View className="mx-4 mt-3 flex-row gap-3">
           <TouchableOpacity
-            className="flex-1 bg-[#007AFF] rounded-lg py-3 items-center"
+            className="min-h-[54px] flex-1 flex-row items-center justify-center rounded-2xl bg-accent-500 px-3 shadow-card"
             onPress={() => { setActiveTab('tracking'); setShowAddTracking(true) }}
             activeOpacity={0.85}
           >
-            <Text className="text-white text-sm font-semibold">+ 跟踪记录</Text>
+            <AppSymbol name="add" size={20} color="#FFFFFF" />
+            <Text className="ml-2 text-base font-semibold text-white">新增跟踪</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            className="flex-1 bg-green-500 rounded-lg py-3 items-center"
+            className="min-h-[54px] flex-1 flex-row items-center justify-center rounded-2xl bg-brand-700 px-3 shadow-card"
             onPress={() => { setActiveTab('sales'); setShowAddSales(true) }}
             activeOpacity={0.85}
           >
-            <Text className="text-white text-sm font-semibold">+ 销售记录</Text>
+            <AppSymbol name="sales" size={20} color="#FFFFFF" />
+            <Text className="ml-2 text-base font-semibold text-white">新增销售</Text>
           </TouchableOpacity>
         </View>
-        <View className="mx-4 mt-3">
-          <View className="flex-row gap-3">
-            <TouchableOpacity
-              className="flex-1 bg-amber-500 rounded-lg py-3 items-center"
-              onPress={() => {
-                setActiveTab('trials')
-                router.push(`/customers/${id}/trial`)
-              }}
-              activeOpacity={0.85}
-            >
-              <Text className="text-white text-sm font-semibold">+ 新增试用</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="flex-1 bg-[#111827] rounded-lg py-3 items-center"
-              onPress={() => router.push({
-                pathname: '/(tabs)/tasks',
-                params: {
-                  createTask: '1',
-                  customerId: String(id),
-                  customerName: customer.name,
-                },
-              })}
-              activeOpacity={0.85}
-            >
-              <Text className="text-white text-sm font-semibold">+ 创建任务</Text>
-            </TouchableOpacity>
-          </View>
+        <View className="mx-4 mt-3 flex-row gap-3">
+          <TouchableOpacity
+            className="min-h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-line bg-white px-3"
+            onPress={() => {
+              setActiveTab('trials')
+              router.push(`/customers/${id}/trial`)
+            }}
+            activeOpacity={0.85}
+          >
+            <AppSymbol name="target" size={18} color="#0A3569" />
+            <Text className="ml-2 text-sm font-semibold text-brand-700">新增试用</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="min-h-12 flex-1 flex-row items-center justify-center rounded-2xl border border-line bg-white px-3"
+            onPress={() => router.push({
+              pathname: '/(tabs)/tasks',
+              params: {
+                createTask: '1',
+                customerId: String(id),
+                customerName: customer.name,
+              },
+            })}
+            activeOpacity={0.85}
+          >
+            <AppSymbol name="tasks" size={18} color="#0A3569" />
+            <Text className="ml-2 text-sm font-semibold text-brand-700">创建任务</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Tab 切换 */}
         <View className="mx-4 mt-4">
-          <View className="flex-row bg-gray-200 rounded-lg p-1">
+          <View className="flex-row overflow-hidden rounded-2xl border border-line bg-white shadow-card">
             <TouchableOpacity
               onPress={() => setActiveTab('tracking')}
-              className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'tracking' ? 'bg-white' : ''}`}
+              className={`min-h-[52px] flex-1 items-center justify-center border-b-[3px] ${activeTab === 'tracking' ? 'border-accent-500 bg-accent-50/50' : 'border-transparent'}`}
             >
-              <Text className={`text-sm font-medium ${activeTab === 'tracking' ? 'text-gray-800' : 'text-gray-400'}`}>
-                跟踪记录 {trackingRecords.length > 0 ? `(${trackingRecords.length})` : ''}
+              <Text className={`text-sm font-semibold ${activeTab === 'tracking' ? 'text-brand-800' : 'text-gray-400'}`}>
+                跟踪记录
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab('sales')}
-              className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'sales' ? 'bg-white' : ''}`}
+              className={`min-h-[52px] flex-1 items-center justify-center border-b-[3px] ${activeTab === 'sales' ? 'border-accent-500 bg-accent-50/50' : 'border-transparent'}`}
             >
-              <Text className={`text-sm font-medium ${activeTab === 'sales' ? 'text-gray-800' : 'text-gray-400'}`}>
-                销售记录 {salesRecords.length > 0 ? `(${salesRecords.length})` : ''}
+              <Text className={`text-sm font-semibold ${activeTab === 'sales' ? 'text-brand-800' : 'text-gray-400'}`}>
+                销售记录
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab('trials')}
-              className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'trials' ? 'bg-white' : ''}`}
+              className={`min-h-[52px] flex-1 items-center justify-center border-b-[3px] ${activeTab === 'trials' ? 'border-accent-500 bg-accent-50/50' : 'border-transparent'}`}
             >
-              <Text className={`text-sm font-medium ${activeTab === 'trials' ? 'text-gray-800' : 'text-gray-400'}`}>
-                试用清单 {trialItems.length > 0 ? `(${trialItems.length})` : ''}
+              <Text className={`text-sm font-semibold ${activeTab === 'trials' ? 'text-brand-800' : 'text-gray-400'}`}>
+                试用清单
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab('tasks')}
-              className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'tasks' ? 'bg-white' : ''}`}
+              className={`min-h-[52px] flex-1 items-center justify-center border-b-[3px] ${activeTab === 'tasks' ? 'border-accent-500 bg-accent-50/50' : 'border-transparent'}`}
             >
-              <Text className={`text-sm font-medium ${activeTab === 'tasks' ? 'text-gray-800' : 'text-gray-400'}`}>
-                任务清单 {taskRecords.length > 0 ? `(${taskRecords.length})` : ''}
+              <Text className={`text-sm font-semibold ${activeTab === 'tasks' ? 'text-brand-800' : 'text-gray-400'}`}>
+                任务清单
               </Text>
             </TouchableOpacity>
           </View>
@@ -883,7 +928,7 @@ export default function CustomerDetailScreen() {
                           📍 {locationLabel}
                         </Text>
                         <TouchableOpacity
-                          className="px-2.5 py-1 rounded-full bg-blue-50"
+                          className="min-h-10 flex-row items-center rounded-xl border border-brand-600 px-3"
                           onPress={() => openNavigation(
                             rec.customer_locations!.latitude,
                             rec.customer_locations!.longitude,
@@ -891,13 +936,14 @@ export default function CustomerDetailScreen() {
                           )}
                           activeOpacity={0.75}
                         >
-                          <Text className="text-[#007AFF] text-xs font-semibold">导航</Text>
+                          <AppSymbol name="navigate" size={16} color="#0A3569" />
+                          <Text className="ml-1 text-brand-700 text-sm font-semibold">导航</Text>
                         </TouchableOpacity>
                       </View>
                     )}
                     {rec.tracking_gifts?.length ? (
-                      <View className="mt-2 rounded-lg bg-amber-50 px-3 py-2">
-                        <Text className="text-amber-700 text-xs">
+                      <View className="mt-2 rounded-xl bg-accent-50 px-3 py-2">
+                        <Text className="text-accent-700 text-sm">
                           赠品：{rec.tracking_gifts.map(gift => `${gift.name} x${gift.quantity}${gift.unit ?? ''}`).join('，')}
                         </Text>
                       </View>
@@ -954,12 +1000,12 @@ export default function CustomerDetailScreen() {
               </View>
             ) : (
               <>
-                <View className="px-4 py-3 bg-amber-50 border-b border-amber-100">
-                  <Text className="text-amber-700 text-xs font-semibold mb-1.5">当前试用结余</Text>
+                <View className="px-4 py-3 bg-accent-50 border-b border-accent-100">
+                  <Text className="text-accent-700 text-sm font-semibold mb-1.5">当前试用结余</Text>
                   <View className="flex-row flex-wrap gap-2">
                     {trialBalanceList.map(balance => (
                       <View key={`${balance.name}-${balance.unit ?? ''}`} className="bg-white rounded-full px-2.5 py-1">
-                        <Text className="text-amber-700 text-xs">
+                        <Text className="text-accent-700 text-sm">
                           {balance.name}：{balance.quantity}{balance.unit ?? ''}
                         </Text>
                       </View>
@@ -986,12 +1032,12 @@ export default function CustomerDetailScreen() {
                           </Text>
                         </View>
                         <View className="items-end">
-                          <Text className={`font-bold text-sm ${item.quantity > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                          <Text className={`font-bold text-sm ${item.quantity > 0 ? 'text-accent-700' : 'text-gray-400'}`}>
                             {item.quantity > 0 ? '发出' : '领回'}
                           </Text>
                           {canReclaim ? (
                             <TouchableOpacity
-                              className="mt-2 px-3 py-1.5 rounded-full bg-[#007AFF]"
+                              className="mt-2 min-h-10 justify-center rounded-xl bg-brand-700 px-3"
                               onPress={() => reclaimTrialItem({ ...item, quantity: remainingQuantity })}
                               activeOpacity={0.8}
                             >

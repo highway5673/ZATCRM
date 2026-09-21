@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import { AppSymbol } from '../../components/AppSymbol'
+import { AppHeader, PageHeader } from '../../components/ui/AppHeader'
 import type { SalesRecord } from '../../types/database'
 
 type CustomerOption = { id: string; name: string; company: string | null }
@@ -179,18 +180,16 @@ function AddSalesModal({
         className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
-          <TouchableOpacity onPress={handleClose}>
-            <Text className="text-gray-500 text-base">取消</Text>
-          </TouchableOpacity>
-          <Text className="text-base font-semibold text-gray-800">新增销售</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving
-              ? <ActivityIndicator size="small" color="#007AFF" />
-              : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
-            }
-          </TouchableOpacity>
-        </View>
+        <AppHeader
+          title="新增销售"
+          backLabel="取消"
+          onBack={handleClose}
+          actionLabel="保存"
+          onAction={handleSave}
+          actionLoading={saving}
+          actionDisabled={saving}
+          actionTone="gold"
+        />
 
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
           <View className="mx-4 mt-4">
@@ -211,7 +210,7 @@ function AddSalesModal({
 
           {/* 关联客户 */}
           {!defaultCustomerId && (
-            <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+            <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">关联客户 *</Text>
               {customers.length === 0 ? (
                 <Text className="text-gray-400 text-sm">请先添加客户</Text>
@@ -228,7 +227,7 @@ function AddSalesModal({
                     }}
                   />
                   {selectedCustomer ? (
-                    <Text className="text-[#007AFF] text-xs mt-2">
+                    <Text className="text-brand-700 text-sm mt-2">
                       已选择：{selectedCustomer.name}{selectedCustomer.company ? ` · ${selectedCustomer.company}` : ''}
                     </Text>
                   ) : null}
@@ -241,7 +240,7 @@ function AddSalesModal({
                           setCustomerSearch(c.name)
                         }}
                         className={`px-2 py-2.5 rounded-lg border items-center ${
-                          customerId === c.id ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
+                          customerId === c.id ? 'bg-brand-700 border-brand-700' : 'bg-white border-gray-200'
                         }`}
                         style={{ width: '31%' }}
                       >
@@ -253,7 +252,7 @@ function AddSalesModal({
                         </Text>
                         {c.company && (
                           <Text
-                            className={`text-xs mt-0.5 text-center ${customerId === c.id ? 'text-blue-100' : 'text-gray-400'}`}
+                            className={`text-xs mt-0.5 text-center ${customerId === c.id ? 'text-accent-100' : 'text-gray-400'}`}
                             numberOfLines={1}
                           >
                             {c.company}
@@ -271,7 +270,7 @@ function AddSalesModal({
           )}
 
           {/* 产品信息 */}
-          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">产品名称 *</Text>
               <TextInput
@@ -330,7 +329,7 @@ function AddSalesModal({
           </View>
 
           {/* 备注 */}
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg p-4">
+          <View className="mx-4 mt-4 mb-8 rounded-2xl border border-line bg-white p-4 shadow-card">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
             <TextInput
               className="text-base text-gray-900"
@@ -412,17 +411,7 @@ export default function SalesScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <View className="bg-brand-600 px-5 pt-14 pb-5">
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-[30px] font-bold text-white">销售</Text>
-          <TouchableOpacity
-            className="bg-accent-500 w-11 h-11 rounded-full items-center justify-center"
-            onPress={() => setShowAdd(true)}
-          >
-            <AppSymbol name="add" size={23} color="white" />
-          </TouchableOpacity>
-        </View>
-
+      <PageHeader title="销售" actionIcon="add" actionLabel="新增" onAction={() => setShowAdd(true)}>
         {records.length > 0 && (
           <View className="flex-row gap-3">
             <View className="flex-1 bg-green-50 rounded-2xl px-4 py-3">
@@ -432,20 +421,20 @@ export default function SalesScreen() {
               </Text>
               <Text className="text-green-400 text-xs">{monthRecords.length} 笔</Text>
             </View>
-            <View className="flex-1 bg-blue-50 rounded-2xl px-4 py-3">
-              <Text className="text-xs text-[#007AFF] font-semibold">累计销售</Text>
-              <Text className="text-[#007AFF] font-bold text-lg mt-1">
+            <View className="flex-1 bg-brand-50 rounded-2xl px-4 py-3 border border-brand-100">
+              <Text className="text-sm text-brand-700 font-semibold">累计销售</Text>
+              <Text className="text-brand-800 font-bold text-lg mt-1">
                 ¥{totalAmount.toLocaleString('zh-CN')}
               </Text>
-              <Text className="text-blue-300 text-xs">{records.length} 笔</Text>
+              <Text className="text-brand-400 text-sm">{records.length} 笔</Text>
             </View>
           </View>
         )}
-      </View>
+      </PageHeader>
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#0A3569" />
         </View>
       ) : (
         <FlatList

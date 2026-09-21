@@ -15,6 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../../lib/supabase'
 import { trackPerf } from '../../../lib/perf'
+import { AppHeader } from '../../../components/ui/AppHeader'
 import type { Customer, CustomerType } from '../../../types/database'
 
 const CUSTOMER_TYPES: CustomerType[] = ['潜在伙伴', '客户', '伙伴']
@@ -175,7 +176,7 @@ export default function EditCustomerScreen() {
   if (loading) {
     return (
       <View className="flex-1 bg-canvas items-center justify-center">
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#0A3569" />
       </View>
     )
   }
@@ -185,21 +186,19 @@ export default function EditCustomerScreen() {
       className="flex-1 bg-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View className="bg-white px-5 pt-14 pb-4 flex-row items-center justify-between border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="w-12">
-          <Text className="text-[#007AFF] text-base">取消</Text>
-        </TouchableOpacity>
-        <Text className="text-base font-semibold text-gray-800">编辑客户</Text>
-        <TouchableOpacity onPress={save} disabled={saving} className="w-12 items-end">
-          {saving
-            ? <ActivityIndicator size="small" color="#007AFF" />
-            : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
-          }
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        title="编辑客户"
+        backLabel="取消"
+        onBack={() => router.back()}
+        actionLabel="保存"
+        onAction={save}
+        actionLoading={saving}
+        actionDisabled={saving}
+        actionTone="gold"
+      />
 
       <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 36 }}>
-        <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
+        <View className="mx-4 mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
           <View className="px-4 pt-4 pb-2 border-b border-gray-50">
             <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">姓名 *</Text>
             <TextInput
@@ -235,12 +234,12 @@ export default function EditCustomerScreen() {
             <View className="flex-row items-center justify-between mb-2">
               <Text className="text-xs text-gray-400 uppercase font-semibold">微信昵称</Text>
               <TouchableOpacity
-                className="rounded-full bg-blue-50 px-3 py-1"
+                className="rounded-full bg-brand-50 px-3 py-1.5"
                 onPress={handleSelectWechat}
                 disabled={selectingWechat}
                 activeOpacity={0.75}
               >
-                <Text className="text-[#007AFF] text-xs font-semibold">
+                <Text className="text-brand-700 text-sm font-semibold">
                   {selectingWechat ? '等待复制' : '选择微信'}
                 </Text>
               </TouchableOpacity>
@@ -255,7 +254,7 @@ export default function EditCustomerScreen() {
           </View>
         </View>
 
-        <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+        <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
           <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">客户类型</Text>
           <View className="flex-row gap-2">
             {CUSTOMER_TYPES.map(type => (
@@ -263,7 +262,7 @@ export default function EditCustomerScreen() {
                 key={type}
                 onPress={() => setCustomerType(type)}
                 className={`flex-1 py-2 rounded-lg border items-center ${
-                  customerType === type ? 'bg-[#007AFF] border-[#007AFF]' : 'bg-white border-gray-200'
+                  customerType === type ? 'bg-brand-700 border-brand-700' : 'bg-white border-gray-200'
                 }`}
               >
                 <Text className={`text-sm font-medium ${customerType === type ? 'text-white' : 'text-gray-600'}`}>
@@ -274,7 +273,7 @@ export default function EditCustomerScreen() {
           </View>
         </View>
 
-        <View className="mx-4 mt-4 bg-white rounded-lg p-4">
+        <View className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
           <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">备注</Text>
           <TextInput
             className="text-base text-gray-900"

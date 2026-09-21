@@ -3,6 +3,8 @@ import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } fr
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { trackPerf } from '../../lib/perf'
+import { AppHeader } from '../../components/ui/AppHeader'
+import { AppSymbol } from '../../components/AppSymbol'
 import type { Task, TaskStatus } from '../../types/database'
 
 type TaskWithCustomer = Task & {
@@ -10,8 +12,8 @@ type TaskWithCustomer = Task & {
 }
 
 const STATUS_META: Record<TaskStatus, { label: string; color: string; background: string }> = {
-  pending: { label: '待办', color: 'text-[#007AFF]', background: 'bg-blue-50' },
-  postponed: { label: '已推迟', color: 'text-amber-600', background: 'bg-amber-50' },
+  pending: { label: '待办', color: 'text-brand-700', background: 'bg-brand-50' },
+  postponed: { label: '已推迟', color: 'text-accent-700', background: 'bg-accent-50' },
   done: { label: '已完成', color: 'text-green-600', background: 'bg-green-50' },
 }
 
@@ -90,7 +92,7 @@ export default function TaskDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-canvas">
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#0A3569" />
       </View>
     )
   }
@@ -99,7 +101,7 @@ export default function TaskDetailScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-canvas px-6">
         <Text className="text-gray-800 text-lg font-semibold">任务不存在或已被删除</Text>
-        <TouchableOpacity className="mt-5 bg-[#007AFF] rounded-lg px-5 py-3" onPress={() => router.back()}>
+        <TouchableOpacity className="mt-5 min-h-[52px] justify-center bg-brand-700 rounded-2xl px-5 py-3" onPress={() => router.back()}>
           <Text className="text-white font-semibold">返回任务列表</Text>
         </TouchableOpacity>
       </View>
@@ -110,13 +112,7 @@ export default function TaskDetailScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <View className="flex-row items-center justify-between px-5 pt-14 pb-4 bg-brand-600 border-b border-brand-500">
-        <TouchableOpacity className="py-1 pr-3" onPress={() => router.back()}>
-          <Text className="text-white text-base font-medium">‹ 任务</Text>
-        </TouchableOpacity>
-        <Text className="text-[20px] font-semibold text-white">任务详情</Text>
-        <View className="w-12" />
-      </View>
+      <AppHeader title="任务详情" backLabel="任务" onBack={() => router.back()} />
 
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 36 }}>
         <View className="bg-white rounded-2xl p-5 border border-line shadow-card">
@@ -143,8 +139,8 @@ export default function TaskDetailScreen() {
             onPress={() => router.push(`/customers/${task.customers?.id}`)}
             activeOpacity={0.75}
           >
-            <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-3">
-              <Text className="text-[#007AFF] text-base">客</Text>
+            <View className="w-11 h-11 rounded-full bg-brand-50 items-center justify-center mr-3">
+              <AppSymbol name="customer" size={21} color="#0A3569" />
             </View>
             <View className="flex-1">
               <Text className="text-gray-400 text-xs mb-0.5">关联客户</Text>
@@ -162,7 +158,7 @@ export default function TaskDetailScreen() {
         <View className="mt-6 gap-3">
           {task.status !== 'done' ? (
             <TouchableOpacity
-              className="bg-[#34C759] rounded-lg py-3.5 items-center"
+              className="min-h-[52px] bg-brand-700 rounded-2xl py-3.5 items-center justify-center"
               onPress={() => void updateStatus('done')}
               disabled={updating}
             >
@@ -171,16 +167,16 @@ export default function TaskDetailScreen() {
           ) : null}
           {task.status === 'pending' ? (
             <TouchableOpacity
-              className="bg-white border border-amber-200 rounded-lg py-3.5 items-center"
+              className="min-h-[52px] bg-white border border-accent-300 rounded-2xl py-3.5 items-center justify-center"
               onPress={() => void updateStatus('postponed')}
               disabled={updating}
             >
-              <Text className="text-amber-600 text-base font-semibold">推迟任务</Text>
+              <Text className="text-accent-700 text-base font-semibold">推迟任务</Text>
             </TouchableOpacity>
           ) : null}
           {task.status !== 'pending' ? (
             <TouchableOpacity
-              className="bg-white border border-gray-200 rounded-lg py-3.5 items-center"
+              className="min-h-[52px] bg-white border border-line rounded-2xl py-3.5 items-center justify-center"
               onPress={() => void updateStatus('pending')}
               disabled={updating}
             >
@@ -188,7 +184,7 @@ export default function TaskDetailScreen() {
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
-            className="bg-white border border-red-200 rounded-lg py-3.5 items-center"
+            className="min-h-[52px] bg-white border border-red-200 rounded-2xl py-3.5 items-center justify-center"
             onPress={confirmDelete}
             disabled={updating}
           >

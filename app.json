@@ -2,7 +2,7 @@
   "expo": {
     "name": "客户关系管理-大卫创业导师",
     "slug": "sales-crm",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/app-icon-brand.png",
     "userInterfaceStyle": "light",
@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.salescrm.app",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#F8F3EA",
         "foregroundImage": "./assets/app-icon-brand.png"
@@ -54,7 +55,9 @@
           "imageWidth": 240,
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-status-bar",
+      "expo-font"
     ],
     "extra": {
       "router": {},

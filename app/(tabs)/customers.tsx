@@ -9,13 +9,14 @@ import { supabase } from '../../lib/supabase'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import { AppSymbol } from '../../components/AppSymbol'
+import { AppHeader, PageHeader } from '../../components/ui/AppHeader'
 import type { Customer, CustomerType } from '../../types/database'
 
 const CUSTOMER_TYPES: CustomerType[] = ['潜在伙伴', '客户', '伙伴']
 
 const TYPE_STYLE: Record<CustomerType, { bg: string; text: string }> = {
   '潜在伙伴': { bg: 'bg-gray-100', text: 'text-gray-500' },
-  '客户':     { bg: 'bg-blue-50', text: 'text-[#007AFF]' },
+  '客户':     { bg: 'bg-brand-50', text: 'text-brand-700' },
   '伙伴':     { bg: 'bg-green-50', text: 'text-green-600' },
 }
 
@@ -119,18 +120,16 @@ function AddCustomerModal({
         className="flex-1 bg-canvas"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-row items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-gray-100">
-          <TouchableOpacity onPress={handleClose}>
-            <Text className="text-gray-500 text-base">取消</Text>
-          </TouchableOpacity>
-          <Text className="text-base font-semibold text-gray-800">新增客户</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving
-              ? <ActivityIndicator size="small" color="#007AFF" />
-              : <Text className="text-[#007AFF] text-base font-semibold">保存</Text>
-            }
-          </TouchableOpacity>
-        </View>
+        <AppHeader
+          title="新增客户"
+          backLabel="取消"
+          onBack={handleClose}
+          actionLabel="保存"
+          onAction={handleSave}
+          actionLoading={saving}
+          actionDisabled={saving}
+          actionTone="gold"
+        />
 
         <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
           <View className="mx-4 mt-4">
@@ -149,7 +148,7 @@ function AddCustomerModal({
             />
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
             <View className="px-4 pt-4 pb-2 border-b border-gray-50">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">姓名 *</Text>
               <TextInput
@@ -193,7 +192,7 @@ function AddCustomerModal({
             </View>
           </View>
 
-          <View className="mx-4 mt-4 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
             <View className="px-4 pt-4 pb-3">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-3">客户类型</Text>
               <View className="flex-row gap-2">
@@ -203,7 +202,7 @@ function AddCustomerModal({
                     onPress={() => setCustomerType(type)}
                     className={`flex-1 py-2 rounded-lg border items-center ${
                       customerType === type
-                        ? 'bg-[#007AFF] border-[#007AFF]'
+                        ? 'bg-brand-700 border-brand-700'
                         : 'bg-white border-gray-200'
                     }`}
                   >
@@ -218,7 +217,7 @@ function AddCustomerModal({
             </View>
           </View>
 
-          <View className="mx-4 mt-4 mb-8 bg-white rounded-lg overflow-hidden">
+          <View className="mx-4 mt-4 mb-8 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
             <View className="px-4 pt-4 pb-2">
               <Text className="text-xs text-gray-400 uppercase font-semibold mb-2">备注</Text>
               <TextInput
@@ -240,11 +239,8 @@ function AddCustomerModal({
   )
 }
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500']
-
 function CustomerCard({ customer, onPress }: { customer: Customer; onPress: () => void }) {
   const initials = customer.name.slice(0, 1)
-  const colorClass = AVATAR_COLORS[customer.name.charCodeAt(0) % AVATAR_COLORS.length]
   const typeStyle = TYPE_STYLE[customer.customer_type] ?? TYPE_STYLE['潜在伙伴']
 
   return (
@@ -253,7 +249,7 @@ function CustomerCard({ customer, onPress }: { customer: Customer; onPress: () =
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View className={`w-11 h-11 rounded-full ${colorClass} items-center justify-center mr-3`}>
+      <View className="mr-3 h-12 w-12 items-center justify-center rounded-full border border-accent-300 bg-brand-700">
         <Text className="text-white text-base font-bold">{initials}</Text>
       </View>
       <View className="flex-1">
@@ -308,17 +304,8 @@ export default function CustomersScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <View className="bg-brand-600 px-5 pt-14 pb-5">
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-[30px] font-bold text-white">客户</Text>
-          <TouchableOpacity
-            className="bg-accent-500 w-11 h-11 rounded-full items-center justify-center"
-            onPress={() => setShowAdd(true)}
-          >
-            <AppSymbol name="add" size={23} color="white" />
-          </TouchableOpacity>
-        </View>
-        <View className="bg-white rounded-2xl flex-row items-center px-4 py-3.5 border border-line shadow-card">
+      <PageHeader title="客户" actionIcon="add" actionLabel="新增" onAction={() => setShowAdd(true)}>
+        <View className="bg-white rounded-2xl flex-row items-center px-4 py-3.5 border border-line shadow-card min-h-[52px]">
           <AppSymbol name="search" size={18} color="#8E8E93" />
           <TextInput
             className="flex-1 text-base text-gray-800"
@@ -333,11 +320,11 @@ export default function CustomersScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </PageHeader>
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#0A3569" />
         </View>
       ) : (
         <FlatList
@@ -352,8 +339,8 @@ export default function CustomersScreen() {
           )}
           ListEmptyComponent={
             <View className="items-center justify-center mt-20">
-              <View className="w-16 h-16 rounded-3xl bg-blue-50 items-center justify-center mb-4">
-                <AppSymbol name="customers" size={30} color="#007AFF" />
+              <View className="w-16 h-16 rounded-3xl bg-brand-50 items-center justify-center mb-4">
+                <AppSymbol name="customers" size={30} color="#0A3569" />
               </View>
               <Text className="text-gray-400 text-base">
                 {query ? '没有匹配的客户' : '还没有客户，点击 + 添加'}

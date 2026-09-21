@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } fr
 import { useFocusEffect, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { AppSymbol, type AppSymbolName } from '../../components/AppSymbol'
+import { PageHeader } from '../../components/ui/AppHeader'
 
 function getWeekRange() {
   const now = new Date()
@@ -95,7 +96,7 @@ export default function DashboardScreen() {
     {
       value: stats?.customerCount,
       label: '客户总数',
-      valueColor: 'text-[#007AFF]',
+      valueColor: 'text-brand-700',
       route: '/(tabs)/customers' as const,
     },
     {
@@ -124,7 +125,7 @@ export default function DashboardScreen() {
 
   const today = TODAY.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
   const quickActions: QuickAction[] = [
-    { title: '管理客户', detail: '客户资料与类型', icon: 'customers', tint: '#007AFF', surface: 'bg-blue-50', route: '/(tabs)/customers' },
+    { title: '管理客户', detail: '客户资料与类型', icon: 'customers', tint: '#0A3569', surface: 'bg-brand-50', route: '/(tabs)/customers' },
     { title: '跟踪记录', detail: '拜访、电话、微信', icon: 'tracking', tint: '#34A853', surface: 'bg-green-50', route: '/(tabs)/tracking' },
     { title: '销售记录', detail: '产品销售和金额', icon: 'sales', tint: '#7C3AED', surface: 'bg-violet-50', route: '/(tabs)/sales' },
     { title: '任务管理', detail: '待办和提醒', icon: 'tasks', tint: '#D97706', surface: 'bg-amber-50', route: '/(tabs)/tasks' },
@@ -132,45 +133,34 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView className="flex-1 bg-canvas" contentContainerStyle={{ paddingBottom: 40 }}>
-      {/* 顶部 */}
-      <View className="bg-brand-600 px-5 pt-14 pb-7">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-[30px] font-bold text-white tracking-tight">仪表盘</Text>
-            <View className="flex-row items-center mt-1">
-              <AppSymbol name="calendar" size={14} color="#8E8E93" />
-              <Text className="text-slate-300 text-sm ml-1.5">{today}</Text>
-            </View>
+      <PageHeader
+        title="仪表盘"
+        subtitle={today}
+        actionIcon="more"
+        actionLabel="账号"
+        onAction={() => setShowSettings(s => !s)}
+      />
+
+      {showSettings && (
+        <View className="mx-4 mb-1 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+          <View className="border-b border-gray-100 px-4 py-3.5">
+            <Text className="text-sm font-semibold text-gray-400">当前账号</Text>
+            <Text className="mt-1 text-base text-brand-800">{phone ? `+86 ${phone}` : '—'}</Text>
           </View>
           <TouchableOpacity
-            onPress={() => setShowSettings(s => !s)}
-            className="w-11 h-11 bg-white/10 rounded-full items-center justify-center border border-white/15"
+            className="min-h-12 flex-row items-center px-4 py-3.5"
+            onPress={handleLogout}
+            activeOpacity={0.7}
           >
-            <AppSymbol name="more" size={22} color="#F7F6F2" />
+            <AppSymbol name="logout" size={19} color="#EF4444" />
+            <Text className="ml-2 text-base font-semibold text-red-500">退出登录</Text>
           </TouchableOpacity>
         </View>
-
-        {showSettings && (
-          <View className="mt-4 bg-white rounded-2xl overflow-hidden border border-black/[0.04] shadow-sm">
-            <View className="px-4 py-3 border-b border-gray-100">
-              <Text className="text-xs text-gray-400 uppercase font-semibold">账号</Text>
-              <Text className="text-gray-700 mt-1">{phone ? `+86 ${phone}` : '—'}</Text>
-            </View>
-            <TouchableOpacity
-              className="px-4 py-3.5 flex-row items-center"
-              onPress={handleLogout}
-              activeOpacity={0.7}
-            >
-              <AppSymbol name="logout" size={18} color="#FF3B30" />
-              <Text className="text-red-500 font-medium ml-2">退出登录</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+      )}
 
       {/* 统计卡片 */}
       <View className="px-4 pt-5">
-        <Text className="text-sm font-semibold text-brand-600 mb-3 px-1">业务概览</Text>
+        <Text className="text-lg font-bold text-brand-800 mb-3 px-1">业务概览</Text>
         <View className="flex-row flex-wrap gap-3">
           {cards.map((card) => (
             <TouchableOpacity
@@ -195,7 +185,7 @@ export default function DashboardScreen() {
 
       {/* 快捷操作 */}
       <View className="px-4 mt-6">
-        <Text className="text-sm font-semibold text-brand-600 mb-3 px-1">工作台</Text>
+        <Text className="text-lg font-bold text-brand-800 mb-3 px-1">工作台</Text>
         <View className="bg-white rounded-2xl overflow-hidden border border-line shadow-card">
           {quickActions.map((action, index) => (
             <TouchableOpacity
