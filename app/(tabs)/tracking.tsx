@@ -6,7 +6,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { attachVisitLocationToTrackingRecord, formatLocationLabel, openNavigation } from '../../lib/location'
+import { formatLocationLabel, openNavigation, resolveVisitLocation } from '../../lib/location'
 import { perfLog, perfNow, trackPerf } from '../../lib/perf'
 import { VoiceInputButton } from '../../components/VoiceInputButton'
 import { AppSymbol } from '../../components/AppSymbol'
@@ -162,23 +162,22 @@ function AddTrackingModal({
       const { data: { user } } = await trackPerf('tracking.add.getUser', () => supabase.auth.getUser())
       if (!user) { setSaving(false); throw new Error('登录已失效') }
 
+      const visitLocation = nextMethod === 'visit'
+        ? await resolveVisitLocation(nextCustomerId)
+        : null
+
       const { data: inserted, error } = await trackPerf('tracking.add.insertRecord', () =>
         supabase.from('tracking_records').insert({
           user_id: user.id,
           customer_id: nextCustomerId,
           method: nextMethod,
           content: nextContent,
-          location_id: null,
+          location_id: visitLocation?.locationId ?? null,
           tracked_at: new Date().toISOString(),
         }).select('id').single(),
-      { method: nextMethod, locationQueued: nextMethod === 'visit' })
+      { method: nextMethod, locationAttached: Boolean(visitLocation) })
 
       if (error) throw error
-      if (nextMethod === 'visit' && inserted) {
-        void attachVisitLocationToTrackingRecord(nextCustomerId, inserted.id)
-          .then((location) => { if (location) onSaved() })
-          .catch(() => undefined)
-      }
       if (nextGiftName && inserted) {
         const { error: giftError } = await trackPerf('tracking.add.insertGift', () =>
           supabase.from('tracking_gifts').insert({
@@ -268,7 +267,7 @@ function AddTrackingModal({
             </ScrollView>
             {METHOD_MAP[method]?.hasGps && (
               <Text className="text-xs text-gray-400 mt-3">
-                保存后将自动补充GPS位置
+                保存时将获取当前GPS位置，并关联到本次拜访
               </Text>
             )}
           </View>

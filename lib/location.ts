@@ -7,7 +7,7 @@ import type { CustomerLocation } from '../types/database'
 
 const DEDUP_METERS = 300
 const GEOCODE_TIMEOUT_MS = 8000
-const LOCATION_FIX_TIMEOUT_MS = 5000
+const LOCATION_FIX_TIMEOUT_MS = 15000
 
 type BigDataCloudAddress = {
   principalSubdivision?: string
@@ -196,8 +196,7 @@ export async function resolveAddressForCoords(lat: number, lon: number): Promise
 }
 
 export type LocationResult =
-  | { locationId: string; address: string | null; isNew: boolean }
-  | null
+  { locationId: string; address: string | null; isNew: boolean }
 
 export async function resolveVisitLocation(customerId: string): Promise<LocationResult> {
   const startedAt = perfNow()
@@ -205,18 +204,32 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
 
   try {
     const granted = await requestLocationPermission()
-    if (!granted) return null
+    if (!granted) {
+      throw new Error('需要定位权限才能保存上门拜访，请在系统设置中允许访问位置后重试')
+    }
+
+    const servicesEnabled = await trackPerf('location.servicesEnabled', () =>
+      ExpoLocation.hasServicesEnabledAsync())
+    if (!servicesEnabled) {
+      throw new Error('手机定位服务未开启，请开启定位服务后重试')
+    }
 
     const coords = await getCurrentCoords()
-    if (!coords) return null
+    if (!coords) {
+      throw new Error('暂时无法获取当前位置，请移动到信号较好的位置后重试')
+    }
     coordinateSource = coords.source
 
-    const { data: existing } = await trackPerf('location.lookupExisting', () =>
+    const { data: existing, error: lookupError } = await trackPerf('location.lookupExisting', () =>
       supabase
         .from('customer_locations')
         .select('*')
         .eq('customer_id', customerId),
     { customerId })
+
+    if (lookupError) {
+      throw new Error('读取客户已有地址失败，请检查网络后重试')
+    }
 
     const nearby = (existing ?? []).find(
       (loc: CustomerLocation) =>
@@ -224,7 +237,26 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
     )
 
     if (nearby) {
-      return { locationId: nearby.id, address: nearby.address, isNew: false }
+      let address = nearby.address
+      if (!address?.trim()) {
+        address = await reverseGeocode(coords.latitude, coords.longitude)
+        if (address) {
+          const { data: updated, error: updateError } = await trackPerf('location.updateAddress', () =>
+            supabase
+              .from('customer_locations')
+              .update({ address })
+              .eq('id', nearby.id)
+              .eq('customer_id', customerId)
+              .select('id')
+              .maybeSingle(),
+          { customerId, locationId: nearby.id })
+
+          if (updateError || !updated) {
+            throw new Error('更新客户当前地址失败，请检查网络后重试')
+          }
+        }
+      }
+      return { locationId: nearby.id, address, isNew: false }
     }
 
     const address = await reverseGeocode(coords.latitude, coords.longitude)
@@ -242,7 +274,9 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
         .single(),
     { customerId })
 
-    if (error || !inserted) return null
+    if (error || !inserted) {
+      throw new Error('保存客户当前位置失败，请检查网络后重试')
+    }
     return { locationId: inserted.id, address, isNew: true }
   } finally {
     perfLog('location.resolveVisitLocation', startedAt, { customerId, coordinateSource })
@@ -257,16 +291,20 @@ export async function attachVisitLocationToTrackingRecord(
 
   try {
     const location = await resolveVisitLocation(customerId)
-    if (!location) return null
 
-    const { error } = await trackPerf('location.attachTrackingRecord', () =>
+    const { data: updated, error } = await trackPerf('location.attachTrackingRecord', () =>
       supabase
         .from('tracking_records')
         .update({ location_id: location.locationId })
-        .eq('id', trackingRecordId),
+        .eq('id', trackingRecordId)
+        .eq('customer_id', customerId)
+        .select('id')
+        .maybeSingle(),
     { customerId, trackingRecordId, isNewLocation: location.isNew })
 
-    if (error) throw error
+    if (error || !updated) {
+      throw new Error('当前位置已获取，但未能关联到本次拜访，请重试')
+    }
     return location
   } finally {
     perfLog('location.attachVisitToTrackingRecord', startedAt, { customerId, trackingRecordId })
