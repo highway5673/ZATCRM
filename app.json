@@ -2,7 +2,7 @@
   "expo": {
     "name": "客户关系管理-大卫创业导师",
     "slug": "sales-crm",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "orientation": "portrait",
     "icon": "./assets/app-icon-brand.png",
     "userInterfaceStyle": "light",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.salescrm.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#F8F3EA",
         "foregroundImage": "./assets/app-icon-brand.png"

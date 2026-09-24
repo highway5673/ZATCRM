@@ -1,13 +1,17 @@
 import * as ExpoLocation from 'expo-location'
 import * as Linking from 'expo-linking'
 import { Alert, Platform } from 'react-native'
+import AndroidLocationManager from '../modules/android-location-manager'
 import { perfLog, perfNow, trackPerf } from './perf'
 import { supabase } from './supabase'
 import type { CustomerLocation } from '../types/database'
 
 const DEDUP_METERS = 300
 const GEOCODE_TIMEOUT_MS = 8000
-const LOCATION_FIX_TIMEOUT_MS = 15000
+const FUSED_LOCATION_FIX_TIMEOUT_MS = 12000
+const ANDROID_LOCATION_MANAGER_TIMEOUT_MS = 45000
+const FALLBACK_LOCATION_MAX_AGE_MS = 2 * 60_000
+const MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS = 500
 
 type BigDataCloudAddress = {
   principalSubdivision?: string
@@ -39,16 +43,15 @@ function haversineMeters(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-export async function requestLocationPermission(): Promise<boolean> {
-  const { status } = await trackPerf('location.permission', () =>
+export async function requestLocationPermission(): Promise<ExpoLocation.LocationPermissionResponse> {
+  return trackPerf('location.permission', () =>
     ExpoLocation.requestForegroundPermissionsAsync())
-  return status === 'granted'
 }
 
 type CurrentCoords = {
   latitude: number
   longitude: number
-  source: 'lastKnown' | 'current'
+  source: 'lastKnown' | 'fused' | 'androidLocationManager'
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -67,7 +70,23 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
   })
 }
 
-export async function getCurrentCoords(): Promise<CurrentCoords | null> {
+async function getAndroidLocationManagerCoords(highAccuracy: boolean): Promise<CurrentCoords> {
+  const position = await AndroidLocationManager.getCurrentPositionAsync(
+    highAccuracy,
+    ANDROID_LOCATION_MANAGER_TIMEOUT_MS,
+    60_000,
+  )
+  if (position.accuracy > MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS) {
+    throw new Error(`Android system location is too imprecise: ${Math.round(position.accuracy)}m`)
+  }
+  return {
+    latitude: position.latitude,
+    longitude: position.longitude,
+    source: 'androidLocationManager',
+  }
+}
+
+export async function getCurrentCoords(highAccuracy = true): Promise<CurrentCoords | null> {
   let lastKnown: ExpoLocation.LocationObject | null = null
   try {
     lastKnown = await trackPerf('location.lastKnownPosition', () =>
@@ -88,16 +107,50 @@ export async function getCurrentCoords(): Promise<CurrentCoords | null> {
   }
 
   try {
-    const loc = await trackPerf('location.currentPosition', () =>
+    const loc = await trackPerf('location.fusedPosition', () =>
       withTimeout(
-        ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High }),
-        LOCATION_FIX_TIMEOUT_MS,
-        '定位超时',
+        ExpoLocation.getCurrentPositionAsync({
+          accuracy: ExpoLocation.Accuracy.Balanced,
+          mayShowUserSettingsDialog: true,
+        }),
+        FUSED_LOCATION_FIX_TIMEOUT_MS,
+        'Google融合定位超时',
       ))
-    return { latitude: loc.coords.latitude, longitude: loc.coords.longitude, source: 'current' }
+    if (loc.coords.accuracy == null || loc.coords.accuracy <= MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS) {
+      return { latitude: loc.coords.latitude, longitude: loc.coords.longitude, source: 'fused' }
+    }
   } catch {
-    return null
+    // Some Android devices sold in China do not have working Google Play location services.
+    // Fall back to Android's platform LocationManager so GPS still works on those devices.
   }
+
+  if (Platform.OS === 'android') {
+    try {
+      return await trackPerf('location.androidLocationManager', () =>
+        getAndroidLocationManagerCoords(highAccuracy))
+    } catch {
+      // Continue to a relaxed cached-position fallback below.
+    }
+  }
+
+  try {
+    const fallback = await trackPerf('location.lastKnownPositionFallback', () =>
+      ExpoLocation.getLastKnownPositionAsync({
+        maxAge: FALLBACK_LOCATION_MAX_AGE_MS,
+        requiredAccuracy: MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS,
+      }))
+    if (fallback) {
+      return {
+        latitude: fallback.coords.latitude,
+        longitude: fallback.coords.longitude,
+        source: 'lastKnown',
+      }
+    }
+  } catch {
+    // All location providers failed.
+  }
+
+  return null
 }
 
 async function fetchJsonWithTimeout<T>(url: string, headers?: Record<string, string>): Promise<T> {
@@ -203,8 +256,8 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
   let coordinateSource: CurrentCoords['source'] | null = null
 
   try {
-    const granted = await requestLocationPermission()
-    if (!granted) {
+    const permission = await requestLocationPermission()
+    if (!permission.granted) {
       throw new Error('需要定位权限才能保存上门拜访，请在系统设置中允许访问位置后重试')
     }
 
@@ -214,9 +267,13 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
       throw new Error('手机定位服务未开启，请开启定位服务后重试')
     }
 
-    const coords = await getCurrentCoords()
+    const highAccuracy = Platform.OS !== 'android' || permission.android?.accuracy !== 'coarse'
+    const coords = await getCurrentCoords(highAccuracy)
     if (!coords) {
-      throw new Error('暂时无法获取当前位置，请移动到信号较好的位置后重试')
+      if (!highAccuracy) {
+        throw new Error('系统只授予了大致位置权限，请在应用权限设置中开启“精确位置”后重试')
+      }
+      throw new Error('手机定位已开启，但系统未向应用返回坐标。请确认本应用允许使用精确位置，并关闭省电模式后重试')
     }
     coordinateSource = coords.source
 
