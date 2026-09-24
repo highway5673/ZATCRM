@@ -50,12 +50,12 @@ jobs:
       - name: Prepare artifact
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/release/app-release.apk artifacts/ZATCRM-1.1.2.apk
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/ZATCRM-1.1.3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: ZATCRM-1.1.2-android
-          path: artifacts/ZATCRM-1.1.2.apk
+          name: ZATCRM-1.1.3-android
+          path: artifacts/ZATCRM-1.1.3.apk
           if-no-files-found: error
           retention-days: 30

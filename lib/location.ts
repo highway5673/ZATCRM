@@ -9,7 +9,7 @@ import type { CustomerLocation } from '../types/database'
 const DEDUP_METERS = 300
 const GEOCODE_TIMEOUT_MS = 8000
 const FUSED_LOCATION_FIX_TIMEOUT_MS = 12000
-const ANDROID_LOCATION_MANAGER_TIMEOUT_MS = 45000
+const ANDROID_LOCATION_MANAGER_TIMEOUT_MS = 60_000
 const FALLBACK_LOCATION_MAX_AGE_MS = 2 * 60_000
 const MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS = 500
 
@@ -74,7 +74,8 @@ async function getAndroidLocationManagerCoords(highAccuracy: boolean): Promise<C
   const position = await AndroidLocationManager.getCurrentPositionAsync(
     highAccuracy,
     ANDROID_LOCATION_MANAGER_TIMEOUT_MS,
-    60_000,
+    FALLBACK_LOCATION_MAX_AGE_MS,
+    MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS,
   )
   if (position.accuracy > MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS) {
     throw new Error(`Android system location is too imprecise: ${Math.round(position.accuracy)}m`)
@@ -84,6 +85,41 @@ async function getAndroidLocationManagerCoords(highAccuracy: boolean): Promise<C
     longitude: position.longitude,
     source: 'androidLocationManager',
   }
+}
+
+async function getFusedCurrentCoords(): Promise<CurrentCoords> {
+  const loc = await withTimeout(
+    ExpoLocation.getCurrentPositionAsync({
+      accuracy: ExpoLocation.Accuracy.High,
+      mayShowUserSettingsDialog: true,
+    }),
+    FUSED_LOCATION_FIX_TIMEOUT_MS,
+    'Google融合定位超时',
+  )
+  if (loc.coords.accuracy != null && loc.coords.accuracy > MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS) {
+    throw new Error(`Fused location is too imprecise: ${Math.round(loc.coords.accuracy)}m`)
+  }
+  return { latitude: loc.coords.latitude, longitude: loc.coords.longitude, source: 'fused' }
+}
+
+function firstSuccessful<T>(attempts: Promise<T>[]): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let remaining = attempts.length
+    const errors: string[] = []
+
+    if (remaining === 0) {
+      reject(new Error('No location provider is available'))
+      return
+    }
+
+    attempts.forEach((attempt) => {
+      attempt.then(resolve, (error) => {
+        errors.push(error instanceof Error ? error.message : String(error))
+        remaining -= 1
+        if (remaining === 0) reject(new Error(errors.join(' | ')))
+      })
+    })
+  })
 }
 
 export async function getCurrentCoords(highAccuracy = true): Promise<CurrentCoords | null> {
@@ -106,28 +142,20 @@ export async function getCurrentCoords(highAccuracy = true): Promise<CurrentCoor
     }
   }
 
-  try {
-    const loc = await trackPerf('location.fusedPosition', () =>
-      withTimeout(
-        ExpoLocation.getCurrentPositionAsync({
-          accuracy: ExpoLocation.Accuracy.Balanced,
-          mayShowUserSettingsDialog: true,
-        }),
-        FUSED_LOCATION_FIX_TIMEOUT_MS,
-        'Google融合定位超时',
-      ))
-    if (loc.coords.accuracy == null || loc.coords.accuracy <= MAX_ACCEPTABLE_LOCATION_ACCURACY_METERS) {
-      return { latitude: loc.coords.latitude, longitude: loc.coords.longitude, source: 'fused' }
-    }
-  } catch {
-    // Some Android devices sold in China do not have working Google Play location services.
-    // Fall back to Android's platform LocationManager so GPS still works on those devices.
-  }
-
   if (Platform.OS === 'android') {
     try {
-      return await trackPerf('location.androidLocationManager', () =>
-        getAndroidLocationManagerCoords(highAccuracy))
+      return await trackPerf('location.firstAvailablePosition', () =>
+        firstSuccessful([
+          trackPerf('location.androidLocationManager', () =>
+            getAndroidLocationManagerCoords(highAccuracy)),
+          trackPerf('location.fusedPosition', getFusedCurrentCoords),
+        ]))
+    } catch {
+      // Continue to a relaxed cached-position fallback below.
+    }
+  } else {
+    try {
+      return await trackPerf('location.fusedPosition', getFusedCurrentCoords)
     } catch {
       // Continue to a relaxed cached-position fallback below.
     }
@@ -273,7 +301,7 @@ export async function resolveVisitLocation(customerId: string): Promise<Location
       if (!highAccuracy) {
         throw new Error('系统只授予了大致位置权限，请在应用权限设置中开启“精确位置”后重试')
       }
-      throw new Error('手机定位已开启，但系统未向应用返回坐标。请确认本应用允许使用精确位置，并关闭省电模式后重试')
+      throw new Error('已尝试GPS、网络定位和系统融合定位，但在等待时间内仍未获得有效坐标，请保持当前页面打开后重试')
     }
     coordinateSource = coords.source
 

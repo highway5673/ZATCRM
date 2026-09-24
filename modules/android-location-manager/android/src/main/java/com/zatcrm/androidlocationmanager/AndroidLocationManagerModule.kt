@@ -7,8 +7,6 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
-import android.os.Build
-import android.os.CancellationSignal
 import android.os.Looper
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
@@ -23,20 +21,37 @@ class AndroidLocationManagerModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("AndroidLocationManager")
 
-    AsyncFunction("getCurrentPositionAsync") Coroutine { highAccuracy: Boolean, timeoutMs: Long, maximumAgeMs: Long ->
+    AsyncFunction("getCurrentPositionAsync") Coroutine {
+      highAccuracy: Boolean,
+      timeoutMs: Long,
+      maximumAgeMs: Long,
+      maximumAccuracyMeters: Double,
+    ->
       val context = appContext.reactContext
         ?: throw LocationUnavailableException("Android application context is unavailable")
       val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
         ?: throw LocationUnavailableException("Android LocationManager is unavailable")
-      val provider = selectProvider(context, manager, highAccuracy)
-        ?: throw LocationUnavailableException("No permitted Android location provider is enabled")
+      val providers = selectProviders(context, manager, highAccuracy)
+      if (providers.isEmpty()) {
+        throw LocationUnavailableException("No permitted Android location provider is enabled")
+      }
 
-      val cached = getLastKnownLocation(manager, provider)
-      val location = if (cached != null && System.currentTimeMillis() - cached.time <= maximumAgeMs) {
+      val cached = getBestLastKnownLocation(
+        manager,
+        providers + LocationManager.PASSIVE_PROVIDER,
+        maximumAgeMs,
+        maximumAccuracyMeters,
+      )
+      val location = if (cached != null) {
         cached
       } else {
         withTimeout(timeoutMs) {
-          requestCurrentLocation(context, manager, provider)
+          requestCurrentLocation(
+            manager,
+            providers,
+            maximumAgeMs,
+            maximumAccuracyMeters,
+          )
         }
       }
 
@@ -50,75 +65,89 @@ class AndroidLocationManagerModule : Module() {
     }
   }
 
-  private fun selectProvider(
+  private fun selectProviders(
     context: Context,
     manager: LocationManager,
     highAccuracy: Boolean,
-  ): String? {
+  ): List<String> {
     val fineGranted = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val coarseGranted = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    val providers = if (highAccuracy) {
-      listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-    } else {
-      listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-    }
+    val coarseOrFineGranted = coarseGranted || fineGranted
 
-    return providers.firstOrNull { provider ->
-      val permissionGranted = if (provider == LocationManager.GPS_PROVIDER) fineGranted else coarseGranted
-      permissionGranted && runCatching { manager.isProviderEnabled(provider) }.getOrDefault(false)
-    }
+    return manager.getProviders(true)
+      .filter { provider ->
+        provider != LocationManager.PASSIVE_PROVIDER && when (provider) {
+          LocationManager.GPS_PROVIDER -> fineGranted
+          else -> coarseOrFineGranted
+        }
+      }
+      .sortedBy { provider ->
+        when (provider) {
+          LocationManager.GPS_PROVIDER -> if (highAccuracy) 0 else 2
+          LocationManager.NETWORK_PROVIDER -> if (highAccuracy) 2 else 0
+          else -> 1
+        }
+      }
+      .distinct()
   }
 
   @SuppressLint("MissingPermission")
-  private fun getLastKnownLocation(manager: LocationManager, provider: String): Location? =
-    runCatching { manager.getLastKnownLocation(provider) }.getOrNull()
+  private fun getBestLastKnownLocation(
+    manager: LocationManager,
+    providers: List<String>,
+    maximumAgeMs: Long,
+    maximumAccuracyMeters: Double,
+  ): Location? = providers
+    .distinct()
+    .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
+    .filter { location -> isUsableLocation(location, maximumAgeMs, maximumAccuracyMeters) }
+    .maxByOrNull { location -> location.time }
+
+  private fun isUsableLocation(
+    location: Location,
+    maximumAgeMs: Long,
+    maximumAccuracyMeters: Double,
+  ): Boolean {
+    val ageMs = System.currentTimeMillis() - location.time
+    val isFresh = ageMs in -60_000L..maximumAgeMs
+    val isAccurate = !location.hasAccuracy() || location.accuracy <= maximumAccuracyMeters.toFloat()
+    return isFresh && isAccurate
+  }
 
   @SuppressLint("MissingPermission")
   private suspend fun requestCurrentLocation(
-    context: Context,
     manager: LocationManager,
-    provider: String,
+    providers: List<String>,
+    maximumAgeMs: Long,
+    maximumAccuracyMeters: Double,
   ): Location = suspendCancellableCoroutine { continuation ->
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      val cancellationSignal = CancellationSignal()
-      continuation.invokeOnCancellation { cancellationSignal.cancel() }
-      try {
-        manager.getCurrentLocation(provider, cancellationSignal, context.mainExecutor) { location ->
-          if (continuation.isActive) {
-            if (location != null) {
-              continuation.resume(location)
-            } else {
-              continuation.resumeWithException(LocationUnavailableException("Android returned no location"))
-            }
-          }
-        }
-      } catch (error: Throwable) {
-        if (continuation.isActive) continuation.resumeWithException(LocationUnavailableException(error))
-      }
-      return@suspendCancellableCoroutine
-    }
-
     val listener = object : LocationListener {
       override fun onLocationChanged(location: Location) {
-        manager.removeUpdates(this)
+        if (!isUsableLocation(location, maximumAgeMs, maximumAccuracyMeters)) return
+        runCatching { manager.removeUpdates(this) }
         if (continuation.isActive) continuation.resume(location)
-      }
-
-      override fun onProviderDisabled(disabledProvider: String) {
-        if (disabledProvider != provider) return
-        manager.removeUpdates(this)
-        if (continuation.isActive) {
-          continuation.resumeWithException(LocationUnavailableException("Location provider was disabled"))
-        }
       }
     }
 
-    continuation.invokeOnCancellation { manager.removeUpdates(listener) }
-    try {
-      manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
-    } catch (error: Throwable) {
-      manager.removeUpdates(listener)
-      if (continuation.isActive) continuation.resumeWithException(LocationUnavailableException(error))
+    continuation.invokeOnCancellation { runCatching { manager.removeUpdates(listener) } }
+
+    var registeredProviderCount = 0
+    var lastError: Throwable? = null
+    providers.forEach { provider ->
+      try {
+        manager.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper())
+        registeredProviderCount += 1
+      } catch (error: Throwable) {
+        lastError = error
+      }
+    }
+
+    if (registeredProviderCount == 0 && continuation.isActive) {
+      runCatching { manager.removeUpdates(listener) }
+      continuation.resumeWithException(
+        lastError?.let { error -> LocationUnavailableException(error) }
+          ?: LocationUnavailableException("Android rejected all location providers"),
+      )
     }
   }
 }

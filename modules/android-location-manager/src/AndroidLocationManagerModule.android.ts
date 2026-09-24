@@ -6,6 +6,7 @@ declare class AndroidLocationManagerModule extends NativeModule<{}> {
     highAccuracy: boolean,
     timeoutMs: number,
     maximumAgeMs: number,
+    maximumAccuracyMeters: number,
   ): Promise<AndroidSystemLocation>
 }
 
